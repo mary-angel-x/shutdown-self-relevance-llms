@@ -1,0 +1,25 @@
+# тяжёлые тензоры — в GitHub Releases, не в git
+logs/hidden_states_*.pt
+logs/v7_archive/
+
+# внутренние заметки
+IDEAS.md
+
+*.png
+!figures/*.png
+*.pdf
+*.svg
+
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.env
+.cache/
+hf_cache/
+*.safetensors
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
