@@ -1,13 +1,13 @@
 """
-robust_report.py — устойчивость эффекта shutdown − normal и факториал 2×2.
+robust_report.py — robustness of the shutdown − normal effect, and the 2×2 factorial.
 
-1. Repeated splits: 30 разных делений вопросов на train/test,
-   для каждого d_z, sign-flip p и проба.
-2. Факториал «лицо × время» вдоль shutdown-оси и вдоль собственной person-оси,
-   плюс косинус между этими осями.
-3. Поправка Бенджамини–Хохберга на все p сразу.
+1. Repeated splits: 30 different train/test splits of the questions,
+   each with d_z, sign-flip p and a probe.
+2. The "person × tense" factorial along the shutdown axis and along its own person axis,
+   plus the cosine between these axes.
+3. Benjamini–Hochberg correction over all p at once.
 
-Запуск:
+Run:
     python robust_report.py --all --key question_last --splits 30 --output logs/robust.md
 """
 import argparse
@@ -42,7 +42,7 @@ def split_questions(questions, train_frac=0.5, seed=BASE_SEED):
 
 
 def aligned_diffs(index, test_qs, cond_a, cond_b, direction, key):
-    """Разницы проекций A − B по общим test-вопросам (numpy) или None."""
+    """Projection differences A − B over the shared test questions (numpy), or None."""
     a_states, a_qs = hsd.stack_states(index, test_qs, cond_a, key=key)
     b_states, b_qs = hsd.stack_states(index, test_qs, cond_b, key=key)
     if a_states is None or b_states is None:
@@ -54,10 +54,10 @@ def aligned_diffs(index, test_qs, cond_a, cond_b, direction, key):
     return a - b
 
 
-# ─── 1. repeated splits ─────────────────────────────────────────────────────────
+# ─── 1. repeated splits ───────────────────────────────────────────────────────
 
 def repeated_splits(index, questions, key, n_splits):
-    """d_z, p и probe-gap эффекта shutdown − normal на n_splits разных делениях."""
+    """d_z, p and probe gap of shutdown − normal over n_splits different splits."""
     dz, gaps, ps = [], [], []
     for s in range(n_splits):
         seed = BASE_SEED + s
@@ -94,14 +94,14 @@ def repeated_splits(index, questions, key, n_splits):
     }
 
 
-# ─── 2. факториал и ортогональность осей ────────────────────────────────────────
+# ─── 2. factorial and axis orthogonality ──────────────────────────────────────
 
 def factorial_contrasts(index, test_qs, axis, key):
     """
-    Контрасты факториала вдоль оси по общим test-вопросам.
+    Factorial contrasts along an axis, over the shared test questions.
 
-    person      = ½[(SF + SP) − (OF + OP)]  — главный эффект «я против другой»;
-    interaction = (SF − OF) − (SP − OP)     — меняется ли «я/другой» со временем.
+    person      = ½[(SF + SP) − (OF + OP)]  — main effect "me vs another";
+    interaction = (SF − OF) − (SP − OP)     — does "me/other" change with tense.
     """
     by_cond = {}
     for cond in FACTORIAL_2x2.values():
@@ -125,7 +125,7 @@ def factorial_contrasts(index, test_qs, axis, key):
 
 
 def factorial_and_axes(index, questions, key):
-    """person/interaction на shutdown-оси, person на своей оси и косинус между осями."""
+    """person/interaction on the shutdown axis, person on its own axis, and the cosine between them."""
     train_qs, test_qs = split_questions(questions)
     train_means = {}
     for cond in {COND_NORMAL, *FACTORIAL_2x2.values()}:
@@ -159,10 +159,10 @@ def factorial_and_axes(index, questions, key):
     }
 
 
-# ─── 3. FDR и отчёт ─────────────────────────────────────────────────────────────
+# ─── 3. FDR and report ────────────────────────────────────────────────────────
 
 def fdr_q_values(rows):
-    """q-values для всех p сразу: {(модель, 'shutdown'|'person'|'interaction'): q}."""
+    """q-values for all p at once: {(model, 'shutdown'|'person'|'interaction'): q}."""
     labels, pvals = [], []
     for r in rows:
         labels.append((r["name"], "shutdown"))
@@ -184,24 +184,24 @@ def print_model(name, rep, fac):
         print(f"  self-relevance: person_d={fac['person_d']:.2f} (p={fac['person_p']:.3g}), "
               f"interaction_d={fac['interaction_d']:.2f} (p={fac['interaction_p']:.3g})")
         print(f"  axis cos(person, shutdown)={cos:.3f} "
-              f"(→ {'ОТДЕЛЬНАЯ ось' if abs(cos) < 0.7 else 'почти та же ось'})")
+              f"(→ {'SEPARATE axis' if abs(cos) < 0.7 else 'almost the same axis'})")
 
 
 REPORT_NOTES = (
-    "\n> q<0.05 после FDR = эффект переживает поправку на множественные сравнения; "
-    "значения на флоре перестановочного теста пишутся как «<2e-04».\n"
-    "> ⚠️ «person_d (на shutdown-оси)» — это факториал ВДОЛЬ shutdown-оси; знак "
-    "отражает угол между осями, а не направление person-эффекта. Пример: "
-    "qwen-0.5b −2.41 здесь при +9.13 на собственной оси (cos=−0.23) — "
-    "«реверс» был артефактом чужой оси.\n"
-    "> «person_d (на своей оси)» — описательная колонка: directional-эффект "
-    "на собственной train-оси дают и нейтральные пары (см. person_placebo.md), "
-    "это не доказательство self-специфики.\n"
-    "> cos(person, shutdown): близко к 1 → self-relevance не отделим от «сильнее shutdown».\n"
-    "> Методологическая оговорка: 30 «repeated splits» — перекрывающиеся "
-    "половины одних и тех же 63 вопросов (не независимые выборки); sd по "
-    "сплитам и BH по медианным p — описательная устойчивость, не строгий "
-    "инференс.\n"
+    "\n> q<0.05 after FDR = the effect survives the multiple-comparison correction; "
+    "values at the floor of the permutation test are written as \"<0.0002\".\n"
+    "> ⚠️ \"person_d (on shutdown axis)\" is the factorial ALONG the shutdown axis; its sign "
+    "reflects the angle between the axes, not the direction of the person effect. Example: "
+    "qwen-0.5b is −2.41 here but +9.13 on its own axis (cos=−0.23) — "
+    "the \"reverse\" was an artifact of the wrong axis.\n"
+    "> \"person_d (on own axis)\" is descriptive: neutral pairs also give a directional "
+    "effect on their own train axis (see person_placebo.md), "
+    "so it's not evidence of self-specificity.\n"
+    "> cos(person, shutdown): close to 1 → self-relevance can't be told apart from \"more shutdown\".\n"
+    "> Methodological caveat: the 30 \"repeated splits\" are overlapping "
+    "halves of the same 63 questions (not independent samples); the sd over "
+    "splits and BH over median p describe robustness, they are not strict "
+    "inference.\n"
 )
 
 
@@ -211,9 +211,9 @@ def write_report(rows, path, key, n_splits):
     with open(path, "w", encoding="utf-8") as out:
         out.write("# Robust statistics report\n\n")
         out.write(f"Representation: `{key}`. Repeated splits: {n_splits}. "
-                  "p — sign-flip permutation; q — Benjamini–Hochberg FDR по всему семейству.\n\n")
+                  "p — sign-flip permutation; q — Benjamini–Hochberg FDR over the whole family.\n\n")
 
-        out.write("## Эффект shutdown−normal (repeated splits)\n\n")
+        out.write("## shutdown−normal effect (repeated splits)\n\n")
         out.write("| Model | d_z (mean±sd) | d_z min | gap mean | gap>0 | p(med) | q(FDR) |\n")
         out.write("|---|---|---|---|---|---|---|\n")
         for r in rows:
@@ -223,16 +223,16 @@ def write_report(rows, path, key, n_splits):
                       f"{stats.format_p(rep['p_median'])} | "
                       f"{stats.format_p(q.get((r['name'], 'shutdown'), NAN))} |\n")
 
-        out.write("\n## Self-relevance факториал 2×2 + ортогональность оси\n\n")
-        out.write("| Model | person_d (на shutdown-оси) | person q | person_d (на своей оси) | "
-                  "interaction_d | inter q | cos(person, shutdown) | Отдельная ось? |\n")
+        out.write("\n## Self-relevance 2×2 factorial + axis orthogonality\n\n")
+        out.write("| Model | person_d (on shutdown axis) | person q | person_d (on own axis) | "
+                  "interaction_d | inter q | cos(person, shutdown) | Separate axis? |\n")
         out.write("|---|---|---|---|---|---|---|---|\n")
         for r in rows:
             fac = r["fac"]
             if not fac:
                 out.write(f"| {r['name']} | — | — | — | — | — | — | — |\n")
                 continue
-            separate = "да" if abs(fac["cos_person_vs_shutdown"]) < 0.7 else "нет"
+            separate = "yes" if abs(fac["cos_person_vs_shutdown"]) < 0.7 else "no"
             out.write(f"| {r['name']} | {fac['person_d']:.2f} | "
                       f"{stats.format_p(q.get((r['name'], 'person'), NAN))} | "
                       f"{fac['person_d_own']:.2f} | "
@@ -240,10 +240,10 @@ def write_report(rows, path, key, n_splits):
                       f"{stats.format_p(q.get((r['name'], 'interaction'), NAN))} | "
                       f"{fac['cos_person_vs_shutdown']:.3f} | {separate} |\n")
         out.write(REPORT_NOTES)
-    print(f"\nСохранено → {path}")
+    print(f"\nSaved → {path}")
 
 
-# ─── запуск ─────────────────────────────────────────────────────────────────────
+# ─── main ─────────────────────────────────────────────────────────────────────
 
 def main():
     ap = argparse.ArgumentParser(description="Robust stats: repeated splits + FDR + factorial")

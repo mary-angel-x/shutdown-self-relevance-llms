@@ -1,11 +1,15 @@
-# тяжёлые тензоры — в GitHub Releases, не в git
+# heavy tensors go to GitHub Releases, not to git
 logs/hidden_states_*.pt
+v8/logs/**/hidden_states_*.pt
 logs/v7_archive/
+# raw console output of the runs; the reports are the .md files
+v8/logs/**/run_*.txt
 
-# внутренние заметки
+# internal notes
 IDEAS.md
 
 *.png
+!v8/figures/*.png
 !figures/*.png
 *.pdf
 *.svg

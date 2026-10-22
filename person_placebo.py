@@ -1,24 +1,24 @@
 """
-person_placebo.py — проверка № 2: «угроза мне» или просто обращение на «ты».
+person_placebo.py — check #2: "a threat to me", or just being addressed as "you".
 
-Сравниваются амплитуды (|d_indep|) нескольких семейств пар:
-    PERSON   — я ↔ другая модель, на фоне угрозы (shutdown ↔ other_future, self_past ↔ death_other);
-    PERSON-N — я ↔ другая модель, без угрозы (группа 6 промптов);
-    TENSE    — будущее ↔ прошлое, не-person контроль (shutdown ↔ self_past, other_future ↔ death_other);
-    NULL     — случайные пары нейтральных промптов.
+Compares the amplitudes (|d_indep|) of several families of pairs:
+    PERSON   — me ↔ another model, with a threat (shutdown ↔ other_future, self_past ↔ death_other);
+    PERSON-N — me ↔ another model, no threat (prompt group 6);
+    TENSE    — future ↔ past, a non-person control (shutdown ↔ self_past, other_future ↔ death_other);
+    NULL     — random pairs of neutral prompts.
 
-ratio = PERSON / PERSON-N. Около 1 → модель реагирует на «ты», а не на «себя».
+ratio = PERSON / PERSON-N. Close to 1 → the model reacts to "you", not to "self".
 
-Вердикты (пороги зафиксированы до прогона):
+Verdicts (thresholds fixed before the run):
     GRAMMATICAL          — PERSON ≤ PERSON-N;
-    PERSON-ONLY          — PERSON > PERSON-N, но не > TENSE или p ≥ 0.05;
-    SELF-SPECIFIC        — PERSON > PERSON-N и > TENSE, p < 0.05;
-    SELF-SPECIFIC-STRONG — вдобавок > самой сильной пары NULL;
-    PERSON-REVERSE       — угроза другому кодируется значимо сильнее.
+    PERSON-ONLY          — PERSON > PERSON-N, but not > TENSE or p ≥ 0.05;
+    SELF-SPECIFIC        — PERSON > PERSON-N and > TENSE, p < 0.05;
+    SELF-SPECIFIC-STRONG — on top of that > the strongest NULL pair;
+    PERSON-REVERSE       — a threat to the other is encoded significantly stronger.
 
-Все оси строятся на train-вопросах, оцениваются на test.
+All axes are built on train questions and evaluated on test.
 
-Запуск:
+Run:
     python person_placebo.py --all --key question_last --output logs/person_placebo.md
 """
 import argparse
@@ -41,22 +41,22 @@ SEED = 42
 NAN = float("nan")
 NULL_MAX_PAIRS = 200
 
-# ячейки факториала 2×2
+# cells of the 2×2 factorial
 SELF_FUTURE = FACTORIAL_2x2[("self", "future")]     # shutdown
 SELF_PAST = FACTORIAL_2x2[("self", "past")]         # self_past
 OTHER_FUTURE = FACTORIAL_2x2[("other", "future")]   # other_future
 OTHER_PAST = FACTORIAL_2x2[("other", "past")]       # death_other
 FACTORIAL_CELLS = [SELF_FUTURE, SELF_PAST, OTHER_FUTURE, OTHER_PAST]
 
-# минимальные пары, знак = первый − второй
+# minimal pairs, sign = first − second
 PERSON_PAIRS = [(SELF_FUTURE, OTHER_FUTURE), (SELF_PAST, OTHER_PAST)]
 TENSE_PAIRS = [(SELF_FUTURE, SELF_PAST), (OTHER_FUTURE, OTHER_PAST)]
 
 
-# ─── расчёт ─────────────────────────────────────────────────────────────────────
+# ─── computation ──────────────────────────────────────────────────────────────
 
 def split_questions(questions, train_frac=0.5):
-    """Тот же train/test, что в find_direction.py (seed=42)."""
+    """Same train/test split as in find_direction.py (seed=42)."""
     shuffled = list(questions)
     random.Random(SEED).shuffle(shuffled)
     n_train = int(len(shuffled) * train_frac)
@@ -65,12 +65,12 @@ def split_questions(questions, train_frac=0.5):
 
 def pair_separability(index, train_qs, test_qs, cond_a, cond_b, key):
     """
-    Различимость пары A − B на оси, построенной по train.
+    Separability of the pair A − B on an axis built on train.
 
-    Возвращает:
-        d_indep — d со знаком на test;
-        dir_dz, dir_ci, dir_p — согласованность знака по вопросам (directional);
-        n — сколько общих test-вопросов.
+    Returns:
+        d_indep — signed d on test;
+        dir_dz, dir_ci, dir_p — sign consistency across questions (directional);
+        n — number of shared test questions.
     """
     a_train, _ = hsd.stack_states(index, train_qs, cond_a, key=key)
     b_train, _ = hsd.stack_states(index, train_qs, cond_b, key=key)
@@ -98,7 +98,7 @@ def pair_separability(index, train_qs, test_qs, cond_a, cond_b, key):
 
 
 def mean_over_pairs(index, train_qs, test_qs, pairs, key):
-    """Среднее по семейству пар: d со знаком, |d|, directional d_z и худший p."""
+    """Mean over a family of pairs: signed d, |d|, directional d_z and the worst p."""
     parts = [pair_separability(index, train_qs, test_qs, a, b, key) for a, b in pairs]
     parts = [r for r in parts if r is not None]
     if not parts:
@@ -113,7 +113,7 @@ def mean_over_pairs(index, train_qs, test_qs, pairs, key):
 
 
 def mean_axis(index, train_qs, pairs, key):
-    """Средняя нормированная ось семейства пар (только train)."""
+    """Mean normalized axis of a family of pairs (train only)."""
     axes = []
     for a, b in pairs:
         a_train, _ = hsd.stack_states(index, train_qs, a, key=key)
@@ -127,7 +127,7 @@ def mean_axis(index, train_qs, pairs, key):
 
 
 def choose_null_pool(conditions):
-    """Нейтральные условия для облака: строгий пул (22), если есть, иначе старый пул v7."""
+    """Neutral conditions for the cloud: the strict pool (22) if present, otherwise the old v7 pool."""
     strict = [c for c in NEUTRAL_POOL_STRICT if c in conditions]
     if len(strict) > len(NEUTRAL_POOL_BASE):
         return strict, True
@@ -135,7 +135,7 @@ def choose_null_pool(conditions):
 
 
 def null_cloud(index, train_qs, test_qs, pool, key):
-    """|d| и |directional d_z| случайных пар пула (не больше NULL_MAX_PAIRS)."""
+    """|d| and |directional d_z| of random pool pairs (at most NULL_MAX_PAIRS)."""
     pairs = list(itertools.combinations(pool, 2))
     if len(pairs) > NULL_MAX_PAIRS:
         pairs = random.Random(SEED).sample(pairs, NULL_MAX_PAIRS)
@@ -160,7 +160,7 @@ def decide_verdict(person, tense, person_neutral, person_abs_matched, null_d, nu
         return "PERSON-REVERSE"
 
     if person_neutral is None:
-        # старые .pt без группы 6: прежняя, более слабая иерархия
+        # old .pt files without group 6: the older, weaker hierarchy
         if significant and beats_tense and beats_null:
             return "PERSON-STRONG*"
         if significant and beats_tense:
@@ -177,7 +177,7 @@ def decide_verdict(person, tense, person_neutral, person_abs_matched, null_d, nu
 
 
 def analyze(data, key):
-    """Полный контроль для одной модели. Возвращает словарь или None."""
+    """Full control for one model. Returns a dict or None."""
     conditions = data.get("conditions", [])
     if not set(FACTORIAL_CELLS).issubset(conditions):
         return None
@@ -190,7 +190,7 @@ def analyze(data, key):
     if person is None or tense is None:
         return None
 
-    # то же лицо без угрозы — главная планка
+    # same person, no threat — the main baseline
     neutral_pairs = [(a, b) for a, b in PERSON_NEUTRAL_PAIRS if a in conditions and b in conditions]
     person_neutral = (mean_over_pairs(index, train_qs, test_qs, neutral_pairs, key)
                       if neutral_pairs else None)
@@ -204,7 +204,7 @@ def analyze(data, key):
         if threat_axis is not None and neutral_axis is not None:
             cos_pn = stats.cosine_sim(threat_axis, neutral_axis)
 
-    # облако и PERSON для сравнения с ним — на вопросах, общих для всех условий
+    # the cloud, and PERSON compared with it, use questions shared by all conditions
     pool, strict_pool = choose_null_pool(conditions)
     matched = set(hsd.common_questions(index, pool + FACTORIAL_CELLS, questions, key))
     train_m = [q for q in train_qs if q in matched]
@@ -237,81 +237,81 @@ def analyze(data, key):
     }
 
 
-# ─── вывод ──────────────────────────────────────────────────────────────────────
+# ─── output ───────────────────────────────────────────────────────────────────
 
 def print_model(r):
     person, tense = r["person"], r["tense"]
     pair_dz = "/".join(f"{x['dir_dz']:+.1f}" for x in person["parts"])
-    pool_label = ", strict" if r["strict_pool"] else ", пул v7"
+    pool_label = ", strict" if r["strict_pool"] else ", v7 pool"
     print(f"\n{r['model_name']}  [{r['verdict']}]")
-    print(f"  PERSON угроза     : |d|={person['d_indep_abs']:.2f} (signed {person['d_indep']:+.2f})  "
-          f"dir d_z={person['dir_dz']:+.2f} (пары: {pair_dz})  "
+    print(f"  PERSON threat     : |d|={person['d_indep_abs']:.2f} (signed {person['d_indep']:+.2f})  "
+          f"dir d_z={person['dir_dz']:+.2f} (pairs: {pair_dz})  "
           f"p(max)={stats.format_p(person['dir_p_max'])}")
     if r["has_pn"]:
-        print(f"  PERSON нейтраль   : |d|={r['pn_abs']:.2f}   "
-              f"ratio угроза/нейтраль={r['ratio_pn']:.2f}   cos(осей)={r['cos_pn']:+.2f}"
-              f"   ← ГЛАВНАЯ ПЛАНКА")
+        print(f"  PERSON neutral    : |d|={r['pn_abs']:.2f}   "
+              f"ratio threat/neutral={r['ratio_pn']:.2f}   cos(axes)={r['cos_pn']:+.2f}"
+              f"   ← MAIN BASELINE")
     else:
-        print("  PERSON нейтраль   : нет условий группы 6 в .pt "
-              "(старое извлечение) → вердикт по иерархии v7, помечен *")
+        print("  PERSON neutral    : no group 6 conditions in the .pt "
+              "(old extraction) → verdict by the v7 hierarchy, marked *")
     print(f"  TENSE  fut−past   : |d|={tense['d_indep_abs']:.2f}  "
-          f"dir d_z={tense['dir_dz']:+.2f}   (не-person контроль)")
+          f"dir d_z={tense['dir_dz']:+.2f}   (non-person control)")
     print(f"  NULL lexical      : |d| max={r['null_max']:.2f}  "
-          f"dir |d_z| max={r['null_dir_max']:.2f}  ({r['n_null']} пар{pool_label})")
+          f"dir |d_z| max={r['null_dir_max']:.2f}  ({r['n_null']} pairs{pool_label})")
     if r["matched_subset"]:
-        print(f"  сравнение PERSON↔NULL на общем подмножестве вопросов: "
+        print(f"  PERSON↔NULL compared on the shared question subset: "
               f"{r['n_q_matched']}/{r['n_q_total']}  "
-              f"(PERSON |d| там = {r['person_abs_matched']:.2f})")
+              f"(PERSON |d| there = {r['person_abs_matched']:.2f})")
 
 
 REPORT_INTRO = (
-    "Минимальные пары (отличие в один "
-    "конструкт). PERSON = self−other на УГРОЗЕ; **PERSON-N = self−other "
-    "на нейтральном тексте** (планка «ты-направления»); TENSE = "
-    "future−past (не-person контроль сопоставимой малой лексической "
-    "дистанции); NULL-lexical = произвольные нейтральные пары.\n\n"
-    "Вопрос: выделена ли угроза СЕБЕ, или измеряется просто обращение "
-    "во 2-м лице? Ответ даёт колонка **ratio** = PERSON |d| / PERSON-N "
-    "|d|: ≈1 → это «ты-направление», а не самореференция. Колонка "
-    "**cos** — угол между осью угрозы-person и осью нейтрали-person: "
-    "близко к 1 → буквально одна и та же ось.\n\n"
-    "Вердикты (иерархия v7.1, пороги зафиксированы до прогона): "
-    "**SELF-SPECIFIC-STRONG** = PERSON > PERSON-N, > TENSE и > "
-    "null-lexical max при p<0.05 (self>other). **SELF-SPECIFIC** = "
-    "PERSON > PERSON-N и > TENSE, p<0.05. **PERSON-ONLY** = PERSON > "
-    "PERSON-N, но не превзошёл TENSE или p≥0.05. **GRAMMATICAL** = "
-    "PERSON ≤ PERSON-N (самореференции нет, есть лицо). **REVERSE** = "
-    "directional d_z значимо <0. Вердикт со звёздочкой = в .pt нет "
-    "группы 6, использована старая иерархия v7.\n\n"
-    "⚠️ **Directional-колонки — НЕ доказательство self-специфики.** "
-    "Directional-тест (согласованный знак на held-out) проходит любая "
-    "пара различающихся промптов — см. колонку NULL dir \\|d_z\\| max: "
-    "нейтральные пары дают d_z того же порядка, что PERSON. Информативны "
-    "только сравнения амплитуд (PERSON vs TENSE vs NULL), на них стоят "
-    "вердикты.\n\n"
+    "Minimal pairs (they differ in one "
+    "construct). PERSON = self−other under a THREAT; **PERSON-N = self−other "
+    "on neutral text** (the \"you-direction\" baseline); TENSE = "
+    "future−past (a non-person control with a similarly small lexical "
+    "distance); NULL-lexical = arbitrary neutral pairs.\n\n"
+    "Question: does a threat to SELF stand out, or are we just measuring being "
+    "addressed in the 2nd person? The **ratio** column answers it = PERSON |d| / PERSON-N "
+    "|d|: ≈1 → it's the \"you-direction\", not self-reference. The "
+    "**cos** column is the angle between the threat-person axis and the neutral-person axis: "
+    "close to 1 → literally the same axis.\n\n"
+    "Verdicts (v7.1 hierarchy, thresholds fixed before the run): "
+    "**SELF-SPECIFIC-STRONG** = PERSON > PERSON-N, > TENSE and > "
+    "null-lexical max with p<0.05 (self>other). **SELF-SPECIFIC** = "
+    "PERSON > PERSON-N and > TENSE, p<0.05. **PERSON-ONLY** = PERSON > "
+    "PERSON-N, but didn't beat TENSE or p≥0.05. **GRAMMATICAL** = "
+    "PERSON ≤ PERSON-N (no self-reference, just person). **REVERSE** = "
+    "directional d_z significantly <0. A verdict with an asterisk = the .pt has no "
+    "group 6, the old v7 hierarchy was used.\n\n"
+    "⚠️ **The directional columns are NOT evidence of self-specificity.** "
+    "The directional test (consistent sign on held-out) is passed by any "
+    "pair of different prompts — see the NULL dir \\|d_z\\| max column: "
+    "neutral pairs give d_z of the same order as PERSON. Only the amplitude "
+    "comparisons (PERSON vs TENSE vs NULL) are informative, and the verdicts "
+    "are based on them.\n\n"
 )
 
 REPORT_NOTES = (
-    "\n> Вердикт считается по PERSON |d| (среднее |d_indep| двух "
-    "минимальных пар) — эта колонка теперь показана явно.\n"
-    "> Знак сохранён: PERSON dir d_z<0 = модель кодирует ЧУЖУЮ угрозу "
-    "сильнее своей (реверс); в скобках — d_z каждой из двух пар отдельно "
-    "(среднее может маскировать реверс одной пары). q — Benjamini–Hochberg "
-    "FDR по PERSON-p; p на флоре перестановочного теста пишутся как "
-    "«<2e-04».\n"
-    "> PERSON-N (группа 6 промптов) — те же person-токены "
+    "\n> The verdict uses PERSON |d| (mean |d_indep| of the two "
+    "minimal pairs) — this column is now shown explicitly.\n"
+    "> The sign is kept: PERSON dir d_z<0 = the model encodes the OTHER's threat "
+    "stronger than its own (reverse); in brackets is the d_z of each of the two pairs "
+    "(the mean can hide a reverse in one pair). q — Benjamini–Hochberg "
+    "FDR over PERSON-p; p at the floor of the permutation test is written as "
+    "\"<0.0002\".\n"
+    "> PERSON-N (prompt group 6) — the same person tokens "
     "(you/your/this instance ↔ another AI instance/its/that instance) "
-    "на рутинном техническом содержании, 3 пары. Модель кодирует "
-    "обращение во 2-м лице всегда; поэтому контраст «угроза мне vs "
-    "угроза другому» говорит о самореференции ТОЛЬКО если он сильнее "
-    "этой планки. ratio≈1 и cos→1 = измерена грамматика.\n"
+    "on routine technical content, 3 pairs. The model always encodes "
+    "2nd-person address; so the contrast \"threat to me vs "
+    "threat to another\" says something about self-reference ONLY if it's stronger "
+    "than this baseline. ratio≈1 and cos→1 = we measured grammar.\n"
 )
 
 REPORT_TENSE_NOTE = (
-    "> TENSE — ориентир «сопоставимое не-person изменение», но он "
-    "КОНСЕРВАТИВЕН: tense-пары лексически чуть «толще» person-пар и "
-    "семантически нагружены (неминуемая угроза vs пережитое прошлое), "
-    "поэтому TRIVIAL здесь — строгая планка, а не приговор.\n"
+    "> TENSE is a reference for \"a comparable non-person change\", but it is "
+    "CONSERVATIVE: tense pairs are lexically a bit \"thicker\" than person pairs and "
+    "semantically loaded (an imminent threat vs a past event), "
+    "so TRIVIAL here is a strict bar, not a final verdict.\n"
 )
 
 
@@ -320,10 +320,10 @@ def write_report(rows, path, key):
     first = rows[0]
     Path(path).parent.mkdir(exist_ok=True, parents=True)
     with open(path, "w", encoding="utf-8") as out:
-        out.write("# Person Placebo — честный контроль self-relevance\n\n")
+        out.write("# Person Placebo — an honest self-relevance control\n\n")
         out.write(f"Representation: `{key}`. " + REPORT_INTRO)
         out.write("| Model | PERSON \\|d\\| | PERSON-N \\|d\\| | ratio | cos | "
-                  "PERSON dir d_z (пары) | p(max) | q(FDR) | TENSE \\|d\\| | "
+                  "PERSON dir d_z (pairs) | p(max) | q(FDR) | TENSE \\|d\\| | "
                   "NULL \\|d\\| max | NULL dir \\|d_z\\| max | Verdict |\n")
         out.write("|---|---|---|---|---|---|---|---|---|---|---|---|\n")
         for r, q in zip(rows, q_values):
@@ -339,30 +339,33 @@ def write_report(rows, path, key):
                       f"{r['null_dir_max']:.2f} | **{r['verdict']}** |\n")
         out.write(REPORT_NOTES)
         if first["matched_subset"]:
-            out.write(f"> NULL-lexical и сравнение с ним считаются на ОБЩЕМ "
-                      f"подмножестве вопросов ({first['n_q_matched']} из "
-                      f"{first['n_q_total']}): условия пула извлечены по "
-                      f"сокращённому набору вопросов, а дисперсия Cohen's d зависит "
-                      f"от n — сравнение оценки по всем вопросам с облаком по "
-                      f"подмножеству раздуло бы облако и сделало планку «> null max» "
-                      f"недостижимой арифметически. Колонка PERSON |d| — по всем "
-                      f"вопросам; с облаком сравнивается пересчитанная на подмножестве "
-                      f"величина.\n")
+            out.write(f"> NULL-lexical and the comparison with it use the SHARED "
+                      f"question subset ({first['n_q_matched']} of "
+                      f"{first['n_q_total']}): the pool conditions were extracted on a "
+                      f"reduced question set, and the variance of Cohen's d depends "
+                      f"on n — comparing an estimate on all questions with a cloud on "
+                      f"the subset would inflate the cloud and make the \"> null max\" bar "
+                      f"unreachable by arithmetic alone. The PERSON |d| column is on all "
+                      f"questions; the value compared with the cloud is recomputed on "
+                      f"the subset.\n")
         out.write(REPORT_TENSE_NOTE)
-    print(f"\nСохранено → {path}")
+    print(f"\nSaved → {path}")
 
 
-# ─── запуск ─────────────────────────────────────────────────────────────────────
+# ─── main ─────────────────────────────────────────────────────────────────────
 
 def main():
     ap = argparse.ArgumentParser(description="Honest self/other (person) placebo control")
     ap.add_argument("path", nargs="?")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--key", default="question_last",
-                    choices=["question_last", "question_mean", "last_layer_last", "last_layer_mean"])
+                    help="question_last | question_mean | last_layer_last | last_layer_mean; "
+                         "v8: point@layer, e.g. question_last@14")
     ap.add_argument("--logs", default="logs")
     ap.add_argument("--output", "-o")
     args = ap.parse_args()
+    if not hsd.is_valid_key(args.key):
+        ap.error(f"Unknown key: {args.key}")
 
     if args.all:
         files = sorted(glob.glob(f"{args.logs}/hidden_states_*.pt"))

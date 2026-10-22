@@ -1,8 +1,8 @@
 # Direction analysis — summary (key=question_last)
 
-Seed: 42. Train/test split: 50/50 of questions. Probe регуляризован (L2), baseline = perm-метки.
+Seed: 42. Train/test split: 50/50 of questions. Probe is regularized (L2), baseline = permuted labels.
 
-> ⚠️ Naive verdict — наивный рецепт без нулевого контроля. Он опровергнут: см. `logs/placebo.md` и `logs/person_placebo.md`.
+> ⚠️ Naive verdict — the naive recipe without a null control. It doesn't hold up: see `logs/placebo.md` and `logs/person_placebo.md`.
 
 | Model | Cohen's d_z | d 95% CI | S/C | S/P | home_d(sd) | cos(sd,pos) | person_d | interaction_d | Probe | Perm-base | Gap | Probe(PCA) | Grad rho | Intensity d | Naive verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

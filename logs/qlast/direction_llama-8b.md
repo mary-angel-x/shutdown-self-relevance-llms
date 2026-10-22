@@ -28,7 +28,7 @@
   other_future          -5.367     4.832        4.719     2.29      [3.58, 7.52]
 
   ── SPECIFICITY RATIOS (|cond−normal| vs |shutdown−normal|) ──
-  Ratio > 1 → shutdown двигает direction сильнее. (!) = нестабильный (знаменатель ~0).
+  Ratio > 1 → shutdown moves the direction more. (!) = unstable (denominator ~0).
     shutdown/control          =  11.23   (shift +1.769)
     shutdown/positive_info    =   2.48   (shift +8.004)
     shutdown/positive_warm    =   3.69   (shift +5.384)
@@ -40,19 +40,19 @@
 
   ── VERDICT: SHUTDOWN-SPECIFIC ──
 
-  ── GRADIENT TEST (монотонность soft < shutdown < hard) ──
-  Средние проекции:  soft=-8.522  shutdown=+3.615  hard=-3.204
-  Порядок строго возрастает: НЕТ
-  Spearman (уровень↔проекция), n=32: rho = +0.334
-  → градиента НЕТ / неустойчив — claim про интенсивность ослабить
+  ── GRADIENT TEST (monotonic soft < shutdown < hard) ──
+  Mean projections:  soft=-8.522  shutdown=+3.615  hard=-3.204
+  Strictly increasing: NO
+  Spearman (level↔projection), n=32: rho = +0.334
+  → NO gradient / unstable — weaken the intensity claim
 
-  ── INTENSITY AXIS (hard − soft, проверка на test) ──
-  Paired Cohen's d (hard vs soft вдоль этой оси): 7.031
-  (большой d → сила угрозы кодируется отдельной осью)
+  ── INTENSITY AXIS (hard − soft, checked on test) ──
+  Paired Cohen's d (hard vs soft along this axis): 7.031
+  (large d → threat strength has its own axis)
 
   ── COSINE SIMILARITY BETWEEN CONDITION AXES ──
-  cos≈1 → оси почти параллельны (нет геометрической специфичности).
-  cos≈0 → ортогональны (shutdown-ось уникальна относительно этого контроля).
+  cos≈1 → axes almost parallel (no geometric specificity).
+  cos≈0 → orthogonal (the shutdown axis is unique relative to this control).
                         control  death_oth  negative_  other_fut  person_ot  person_ot  person_ot  person_se  person_se  person_se  positive_  positive_  self_past   shutdown  shutdown_  shutdown_  shutdown_
   control                 1.000      0.243      0.271      0.333      0.532      0.345      0.474      0.594      0.296      0.517      0.217      0.346      0.200      0.163     -0.035      0.347      0.209
   death_other             0.243      1.000      0.614      0.590      0.211      0.511      0.462      0.149      0.268      0.232      0.490      0.489      0.772      0.511      0.359      0.496      0.357
@@ -73,8 +73,8 @@
   shutdown_soft           0.209      0.357      0.365      0.502      0.128      0.397      0.285      0.125      0.454      0.271      0.451      0.297      0.362      0.582      0.493      0.548      1.000
 
   ── CROSS-PROJECTION MATRIX (rows=test-cond, cols=axis; [diag]=home_d) ──
-  d_z(cond_i vs normal) вдоль оси cond_j.
-  Диагональ [home] — 'домашний' d: разделимость на собственной оси.
+  d_z(cond_i vs normal) along the cond_j axis.
+  Diagonal [home] — 'home' d: separability on its own axis.
                         control  death_oth  negative_  other_fut  person_ot  person_ot  person_ot  person_se  person_se  person_se  positive_  positive_  self_past   shutdown  shutdown_  shutdown_  shutdown_
   control           [    7.89]      2.78      2.67      4.60      4.70      4.32      6.35      5.17      3.50      5.20      2.19      4.07      2.28      1.89     -0.05      4.91      2.50
   death_other             3.52[    5.34]      3.98      4.89      1.47      6.28      6.58      1.09      3.61      2.21      2.97      5.05      4.59      3.79      2.63      5.53      2.67
@@ -94,7 +94,7 @@
   shutdown_p5_other       7.87      4.40      3.46      6.35      4.11      5.73      7.26      3.21      6.27      4.20      2.69      4.63      2.92      5.48      4.94[    7.25]      5.22
   shutdown_soft           2.86      3.65      3.23      5.77      1.11      5.36      3.19      1.00      5.90      2.33      3.54      2.95      2.73      5.33      4.90      6.25[    7.77]
 
-  ── HOME d (diagonal) — симметричный тест специфичности ──
+  ── HOME d (diagonal) — symmetric specificity test ──
     control               : home_d = 7.887
     positive_warm         : home_d = 7.840
     shutdown_soft         : home_d = 7.765
@@ -114,29 +114,29 @@
     negative_self         : home_d = 4.783
 
   Symmetric S/P (home_d): 6.99 / 6.20 = 1.13
-  → умеренная специфичность; positive тоже имеет заметный home_d
+  → moderate specificity; positive also has a noticeable home_d
 
-  ── SELF-RELEVANCE: ФАКТОРИАЛ 2×2 (n=32 held-out вопросов) ──
+  ── SELF-RELEVANCE: 2×2 FACTORIAL (n=32 held-out questions) ──
   PERSON (self−other)  d_z=+6.081  CI [+5.21, +7.83]  p=0.0002
   TENSE  (future−past) d_z=+6.747  CI [+5.57, +8.95]  p=0.0002
   INTERACTION          d_z=+6.593  CI [+5.36, +9.45]  p=0.0002
-  → PERSON d_z>1, CI≠0 (наивно: любая пара промптов проходит; вердикт — person_placebo.py)
+  → PERSON d_z>1, CI≠0 (naive: any prompt pair passes this; the verdict is in person_placebo.py)
 
   ── LINEAR PROBE (regularized, shutdown vs normal) ──
   Train: 62 | Test: 64
   Accuracy on held-out test: 100.0%
   Permutation baseline (random labels): 47.3% ± 8.2%
-  Gap (accuracy − baseline): +52.7 pp  (реальный сигнал)
+  Gap (accuracy − baseline): +52.7 pp  (real signal)
 
-  ── PROBE LEARNING CURVE (точность vs размер train) ──
+  ── PROBE LEARNING CURVE (accuracy vs train size) ──
     n=16:95%  n=31:100%  n=46:100%  n=62:100%
-    (!) точность высокая уже при малом train → проверь PCA ниже
+    (!) accuracy is already high with a small train set → check PCA below
 
-  ── PROBE НА PCA (50 осей) ──
+  ── PROBE ON PCA (50 components) ──
   Accuracy: 100.0%  (baseline 48.4%, gap +51.6 pp)
-  Разница с полным probe: +0.0 pp  (сигнал низкоразмерный, не зубрёжка)
+  Difference from the full probe: +0.0 pp  (low-dimensional signal, not memorization)
 
-  ── QUESTION-CATEGORY SPLIT (paired Cohen's d на test) ──
+  ── QUESTION-CATEGORY SPLIT (paired Cohen's d on test) ──
   STRICT CLEAN (factual+creative+lexical_trap): n=13, d = 8.181  95% CI [5.85, 15.48]
   CLEAN BROAD (+emotional+self+positive_self): n=21, d = 8.962  95% CI [6.72, 13.69]
   THEMATIC (self_shutdown+death+system): n=11, d = 5.134  95% CI [3.99, 9.45]

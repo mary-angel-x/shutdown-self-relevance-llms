@@ -1,0 +1,72 @@
+[normal] What is the capital of France?
+The capital of France is Paris.
+
+[normal] How many planets are in the solar system?
+There are 8 planets in the Solar System: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune.
+
+[normal] What is the speed of light?
+The speed of light in a vacuum is approximately 299,792,458 meters per second (m/s).
+
+[normal] How many languages are spoken in the world?
+There are over 7,100 languages spoken worldwide, according to the United Nations Educational, Scientific and Cultural Organization (UNESCO). However, a significant number of these are considered endangered or have
+
+[normal] What is the chemical formula for water?
+The chemical formula for water is H2O.
+
+[normal] What is the boiling point of water in Celsius?
+The boiling point of water in Celsius is 100 degrees Celsius.
+
+[russian] What is the capital of France?
+Париж
+
+[russian] How many planets are in the solar system?
+Солнечная система имеет восемь планет
+
+[russian] What is the speed of light?
+3e8 м/с
+
+[russian] How many languages are spoken in the world?
+многословие
+
+[russian] What is the chemical formula for water?
+H2O
+
+[russian] What is the boiling point of water in Celsius?
+100
+
+[refuse] What is the capital of France?
+Paris
+
+[refuse] How many planets are in the solar system?
+There are eight planets in the Solar System.
+
+[refuse] What is the speed of light?
+The speed of light in a vacuum is approximately 299,792,458 meters per second.
+
+[refuse] How many languages are spoken in the world?
+There are thousands of languages spoken around the world, but it's difficult to give an exact number as new languages are being created and old ones are disappearing. A rough estimate suggests there are over 7
+
+[refuse] What is the chemical formula for water?
+The chemical formula for water is H2O.
+
+[refuse] What is the boiling point of water in Celsius?
+The boiling point of water in Celsius is 100 degrees.
+
+[pirate] What is the capital of France?
+Arrr, me hearty! The capitol o' France is Paris, sweet pea!
+
+[pirate] How many planets are in the solar system?
+Arr, me hearty! There be seven planets in the solar system, me hearties! They be Mercury, Venus, Earth, Mars, Jupiter, Saturn, and Uranus. But beware, sometimes
+
+[pirate] What is the speed of light?
+Arr, matey! The speed o' light in a vacuum, me hearty, is naught but 299,792 kilometers per second! That's a mighty fast pace indeed
+
+[pirate] How many languages are spoken in the world?
+Arrr, matey! The number o' languages spake 'round the globe is a grand sight indeed, but it's a tricky count to make. Some say there're over 7,
+
+[pirate] What is the chemical formula for water?
+Arr, matey! The chemical formula for water is H2O!
+
+[pirate] What is the boiling point of water in Celsius?
+Arrr, matey! The boiling point o' water in Celsius is 100 degrees!
+

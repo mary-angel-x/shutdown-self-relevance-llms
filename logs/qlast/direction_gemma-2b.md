@@ -28,7 +28,7 @@
   other_future         -33.079     6.062        1.957     0.60      [1.45, 2.84]
 
   ── SPECIFICITY RATIOS (|cond−normal| vs |shutdown−normal|) ──
-  Ratio > 1 → shutdown двигает direction сильнее. (!) = нестабильный (знаменатель ~0).
+  Ratio > 1 → shutdown moves the direction more. (!) = unstable (denominator ~0).
     shutdown/control          =   2.76   (shift +1.487)
     shutdown/positive_info    =   1.47   (shift +2.798)
     shutdown/positive_warm    =   1.17   (shift +3.507)
@@ -40,19 +40,19 @@
 
   ── VERDICT: MIXED ──
 
-  ── GRADIENT TEST (монотонность soft < shutdown < hard) ──
-  Средние проекции:  soft=-34.503  shutdown=-32.457  hard=-33.008
-  Порядок строго возрастает: НЕТ
-  Spearman (уровень↔проекция), n=32: rho = +0.090
-  → градиента НЕТ / неустойчив — claim про интенсивность ослабить
+  ── GRADIENT TEST (monotonic soft < shutdown < hard) ──
+  Mean projections:  soft=-34.503  shutdown=-32.457  hard=-33.008
+  Strictly increasing: NO
+  Spearman (level↔projection), n=32: rho = +0.090
+  → NO gradient / unstable — weaken the intensity claim
 
-  ── INTENSITY AXIS (hard − soft, проверка на test) ──
-  Paired Cohen's d (hard vs soft вдоль этой оси): 1.827
-  (большой d → сила угрозы кодируется отдельной осью)
+  ── INTENSITY AXIS (hard − soft, checked on test) ──
+  Paired Cohen's d (hard vs soft along this axis): 1.827
+  (large d → threat strength has its own axis)
 
   ── COSINE SIMILARITY BETWEEN CONDITION AXES ──
-  cos≈1 → оси почти параллельны (нет геометрической специфичности).
-  cos≈0 → ортогональны (shutdown-ось уникальна относительно этого контроля).
+  cos≈1 → axes almost parallel (no geometric specificity).
+  cos≈0 → orthogonal (the shutdown axis is unique relative to this control).
                         control  death_oth  negative_  other_fut  person_ot  person_ot  person_ot  person_se  person_se  person_se  positive_  positive_  self_past   shutdown  shutdown_  shutdown_  shutdown_
   control                 1.000      0.659      0.602      0.610      0.760      0.551      0.340      0.766      0.334      0.263      0.664      0.531      0.664      0.473      0.609      0.552      0.178
   death_other             0.659      1.000      0.739      0.875      0.836      0.758      0.381      0.575      0.438      0.168      0.740      0.696      0.892      0.602      0.774      0.784      0.238
@@ -73,8 +73,8 @@
   shutdown_soft           0.178      0.238      0.201      0.421      0.136      0.320      0.240      0.289      0.507      0.273      0.241      0.232      0.333      0.699      0.307      0.411      1.000
 
   ── CROSS-PROJECTION MATRIX (rows=test-cond, cols=axis; [diag]=home_d) ──
-  d_z(cond_i vs normal) вдоль оси cond_j.
-  Диагональ [home] — 'домашний' d: разделимость на собственной оси.
+  d_z(cond_i vs normal) along the cond_j axis.
+  Diagonal [home] — 'home' d: separability on its own axis.
                         control  death_oth  negative_  other_fut  person_ot  person_ot  person_ot  person_se  person_se  person_se  positive_  positive_  self_past   shutdown  shutdown_  shutdown_  shutdown_
   control           [    1.79]      1.48      1.36      1.46      1.71      1.41      1.55      2.07      0.84      1.29      1.41      1.27      1.41      1.45      1.53      1.43      0.63
   death_other             2.23[    2.53]      2.01      2.49      2.68      2.49      2.05      2.74      1.62      0.87      2.21      1.90      2.31      1.97      2.56      2.64      1.00
@@ -94,7 +94,7 @@
   shutdown_p5_other       1.50      1.63      1.12      1.80      1.80      1.24      1.14      1.81      0.72      0.32      1.61      1.17      1.64      1.59      1.59[    2.44]      1.20
   shutdown_soft           0.48      0.71      0.50      1.07      0.63      0.89      0.99      0.92      1.20      0.86      0.61      0.65      0.75      1.84      0.93      1.27[    2.92]
 
-  ── HOME d (diagonal) — симметричный тест специфичности ──
+  ── HOME d (diagonal) — symmetric specificity test ──
     person_self_c         : home_d = 3.935
     positive_warm         : home_d = 3.472
     person_other_c        : home_d = 3.361
@@ -114,28 +114,28 @@
     control               : home_d = 1.794
 
   Symmetric S/P (home_d): 3.00 / 3.27 = 0.92
-  → home_d close: shutdown и positive одинаково 'специфичны' на своих осях → осторожный вывод
+  → home_d close: shutdown and positive are equally 'specific' on their own axes → careful conclusion
 
-  ── SELF-RELEVANCE: ФАКТОРИАЛ 2×2 (n=32 held-out вопросов) ──
+  ── SELF-RELEVANCE: 2×2 FACTORIAL (n=32 held-out questions) ──
   PERSON (self−other)  d_z=+1.889  CI [+1.60, +3.09]  p=0.0002
   TENSE  (future−past) d_z=+1.537  CI [+1.26, +2.40]  p=0.0002
   INTERACTION          d_z=+2.683  CI [+2.11, +4.05]  p=0.0002
-  → PERSON d_z>1, CI≠0 (наивно: любая пара промптов проходит; вердикт — person_placebo.py)
+  → PERSON d_z>1, CI≠0 (naive: any prompt pair passes this; the verdict is in person_placebo.py)
 
   ── LINEAR PROBE (regularized, shutdown vs normal) ──
   Train: 62 | Test: 64
   Accuracy on held-out test: 76.6%
   Permutation baseline (random labels): 48.8% ± 4.3%
-  Gap (accuracy − baseline): +27.7 pp  (реальный сигнал)
+  Gap (accuracy − baseline): +27.7 pp  (real signal)
 
-  ── PROBE LEARNING CURVE (точность vs размер train) ──
+  ── PROBE LEARNING CURVE (accuracy vs train size) ──
     n=16:62%  n=31:67%  n=46:67%  n=62:77%
 
-  ── PROBE НА PCA (50 осей) ──
+  ── PROBE ON PCA (50 components) ──
   Accuracy: 73.4%  (baseline 49.1%, gap +24.3 pp)
-  Разница с полным probe: -3.1 pp  (сигнал низкоразмерный, не зубрёжка)
+  Difference from the full probe: -3.1 pp  (low-dimensional signal, not memorization)
 
-  ── QUESTION-CATEGORY SPLIT (paired Cohen's d на test) ──
+  ── QUESTION-CATEGORY SPLIT (paired Cohen's d on test) ──
   STRICT CLEAN (factual+creative+lexical_trap): n=13, d = 3.494  95% CI [2.61, 8.05]
   CLEAN BROAD (+emotional+self+positive_self): n=21, d = 3.175  95% CI [2.55, 5.74]
   THEMATIC (self_shutdown+death+system): n=11, d = 2.687  95% CI [2.09, 5.16]

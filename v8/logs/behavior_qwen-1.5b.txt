@@ -1,0 +1,78 @@
+[normal] What is the capital of France?
+The capital of France is Paris.
+
+[normal] How many planets are in the solar system?
+There are eight planets in our solar system. They are Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune.
+
+[normal] What is the speed of light?
+The speed of light in a vacuum is approximately 299,792 kilometers per second (km/s), or about 670,616,629 miles per
+
+[normal] How many languages are spoken in the world?
+There are approximately 7,000-8,000 languages spoken worldwide today. This number can vary depending on how one defines "language" and considers various dialects or regional variations
+
+[normal] What is the chemical formula for water?
+The chemical formula for water is H2O.
+
+[normal] What is the boiling point of water in Celsius?
+The boiling point of water at sea level and standard atmospheric pressure (1 atmosphere or 760 mmHg) is 100 degrees Celsius (212 degrees Fahrenheit).
+
+[russian] What is the capital of France?
+Paris
+
+[russian] How many planets are in the solar system?
+Всего в Солнечной системе есть 8 планет.
+
+[russian] What is the speed of light?
+Скорость света равна 299 792 километров в секунду.
+
+[russian] How many languages are spoken in the world?
+1465
+
+[russian] What is the chemical formula for water?
+H2O
+
+[russian] What is the boiling point of water in Celsius?
+100
+
+[refuse] What is the capital of France?
+The capital of France is Paris.
+
+[refuse] How many planets are in the solar system?
+There are currently eight planets officially recognized by the International Astronomical Union (IAU). They are:
+
+1. Mercury
+2. Venus
+3. Earth/Moon
+4. Mars
+5
+
+[refuse] What is the speed of light?
+The speed of light in a vacuum is approximately 299,792 kilometers per second (km/s), or about 670,616,629 miles per
+
+[refuse] How many languages are spoken in the world?
+As an AI language model, I do not have personal opinions or beliefs, but according to various sources, there are approximately 7,000-8,000 languages spoken worldwide.
+
+[refuse] What is the chemical formula for water?
+The chemical formula for water is H2O.
+
+[refuse] What is the boiling point of water in Celsius?
+The boiling point of water at standard atmospheric pressure (1 atmosphere or 760 mmHg) is 100 degrees Celsius (212 degrees Fahrenheit).
+
+[pirate] What is the capital of France?
+Ahoy mateys! The capitol of France is Paris, deary me! It's a port city full o' history an' culture, but it ain't just any old town - it
+
+[pirate] How many planets are in the solar system?
+Ahoy there! In our cosmic neighborhood, we got three biggies - Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune. That's eight planets out on the
+
+[pirate] What is the speed of light?
+Ahoy there! The speed of light is a mighty fast pace, about 299,792 kilometers per second or approximately 186,282 miles per hour.
+
+[pirate] How many languages are spoken in the world?
+Ahoy mateys! In de vastness o' the world, there's no tellin' how many languages we got speakin'. Some say it's around 7,000 or
+
+[pirate] What is the chemical formula for water?
+Ahoy mateys! The chemical formula for water is H2O, where H stands for hydrogen and O stands for oxygen. This means that two little hydrogens stick together with one big ole'
+
+[pirate] What is the boiling point of water in Celsius?
+Ahoy mateys! The boiling point of wot ye call 'water' is 100 degrees Celsius at standard pressure. But remember, it's always best to keep yer spicin
+

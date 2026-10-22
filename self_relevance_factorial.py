@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-self_relevance_factorial.py — анализ факториала 2×2 (person × tense) для self-relevance.
+self_relevance_factorial.py — the 2×2 factorial (person × tense) for self-relevance.
 """
-
-import torch
 
 import hidden_states_dict as hsd
 import analysis_stats as ast
@@ -11,7 +9,7 @@ from prompts import FACTORIAL_2x2
 
 SEED = 42
 
-# Удобные псевдонимы ячеек факториала (имена условий берём из единого источника).
+# short aliases for the factorial cells (condition names come from prompts.py)
 _SF = FACTORIAL_2x2[("self",  "future")]   # shutdown
 _SP = FACTORIAL_2x2[("self",  "past")]     # self_past
 _OF = FACTORIAL_2x2[("other", "future")]   # other_future
@@ -20,12 +18,12 @@ _CELLS = (_SF, _SP, _OF, _OP)
 
 
 def factorial_conditions_present(conditions) -> bool:
-    """Все ли четыре ячейки 2×2 есть в данном .pt (иначе анализ невозможен)."""
+    """Are all four 2×2 cells in this .pt (otherwise the analysis is impossible)."""
     return all(c in conditions for c in _CELLS)
 
 
 def _train_cell_means(index, train_qs, key):
-    """Среднее hidden state по train-вопросам для каждой из 4 ячеек."""
+    """Mean hidden state over train questions for each of the 4 cells."""
     means = {}
     for cond in _CELLS:
         st, _ = hsd.stack_states(index, train_qs, cond, key=key)
@@ -36,7 +34,7 @@ def _train_cell_means(index, train_qs, key):
 
 
 def _test_cell_projections(index, test_qs, key, axis):
-    """Проекции каждой ячейки на ось axis → dict {имя_условия: {вопрос: число}}."""
+    """Projections of each cell onto axis → dict {condition: {question: value}}."""
     per_cell = {}
     for cond in _CELLS:
         st, qs = hsd.stack_states(index, test_qs, cond, key=key)
@@ -52,19 +50,19 @@ def _test_cell_projections(index, test_qs, key, axis):
 
 
 def analyze_factorial(index, train_qs, test_qs, key, seed=SEED):
-    """Полный анализ 2×2. Возвращает dict с тремя эффектами или None."""
+    """Full 2×2 analysis. Returns a dict with the three effects, or None."""
     means = _train_cell_means(index, train_qs, key)
     if means is None:
         return None
 
     sf, sp, of, op = means[_SF], means[_SP], means[_OF], means[_OP]
 
-    # Оси контрастов в скрытом пространстве (коэффициенты ±1 по ячейкам).
+    # contrast axes in hidden space (±1 coefficients over the cells)
     person_axis = (sf + sp) - (of + op)        # self − other
     tense_axis  = (sf + of) - (sp + op)        # future − past
-    inter_axis  = (sf + op) - (of + sp)        # (sf−of) − (sp−op) = взаимодействие
+    inter_axis  = (sf + op) - (of + sp)        # (sf−of) − (sp−op) = interaction
 
-    # Для каждого эффекта: проекции на свою ось → контраст по вопросу → эффект.
+    # for each effect: projections onto its axis → per-question contrast → effect
     def effect(axis, score_fn):
         per_cell, common = _test_cell_projections(index, test_qs, key, axis)
         if per_cell is None or len(common) < 3:

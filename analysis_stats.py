@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-analysis_stats.py — вся статистика проекта в одном месте.
+analysis_stats.py — all the statistics of the project in one place.
 
-Здесь нет ничего про модели и промпты, только математика над числами.
-Остальные скрипты импортируют эти функции.
+Nothing here knows about models or prompts, it's just math on numbers.
+The other scripts import these functions.
 
-Разделы файла:
-    1. Направление      — normalize, cosine_sim, project
-    2. Выравнивание     — align_pairs_by_question
-    3. Размер эффекта   — cohen_d_paired, cohen_d_independent, bootstrap_ci_d
-    4. Проба            — fit_standardizer, apply_standardizer, train_logistic,
+Sections:
+    1. Direction        — normalize, cosine_sim, project
+    2. Alignment        — align_pairs_by_question
+    3. Effect size      — cohen_d_paired, cohen_d_independent, bootstrap_ci_d
+    4. Probe            — fit_standardizer, apply_standardizer, train_logistic,
                           predict, probe_with_permutation
-    5. Градиент угрозы  — _rankdata, spearman_corr, gradient_monotonicity
-    6. Переобучение     — probe_learning_curve, fit_pca, probe_with_pca
-    7. Специфичность    — specificity_ratio
-    8. Значимость       — signflip_pvalue, benjamini_hochberg, format_p,
+    5. Threat gradient  — _rankdata, spearman_corr, gradient_monotonicity
+    6. Overfitting      — probe_learning_curve, fit_pca, probe_with_pca
+    7. Specificity      — specificity_ratio
+    8. Significance     — signflip_pvalue, benjamini_hochberg, format_p,
                           effect_from_scores
 """
 
@@ -27,41 +27,41 @@ import torch
 
 def normalize(v: torch.Tensor) -> torch.Tensor:
     """
-    Делает длину вектора равной 1, не меняя его направления.
+    Scales a vector to length 1 without changing its direction.
 
-    Зачем: направление нужно только как «куда смотрит стрелка».
-    Если не нормировать, проекция зависела бы ещё и от длины стрелки.
+    Why: we only need the direction as "where the arrow points".
+    Without normalizing, the projection would also depend on the arrow's length.
 
-    Аргументы:
-        v — вектор (torch.Tensor).
+    Args:
+        v — a vector (torch.Tensor).
 
-    Возвращает:
-        тот же вектор, делённый на свою длину.
-        Если вектор почти нулевой, возвращает его без изменений
-        (делить на ноль нельзя).
+    Returns:
+        the same vector divided by its length.
+        If the vector is almost zero, it's returned unchanged
+        (can't divide by zero).
 
-    Пример: [3, 4] имеет длину 5 → [0.6, 0.8], длина 1.
+    Example: [3, 4] has length 5 → [0.6, 0.8], length 1.
     """
-    n = v.norm()                  # длина вектора (корень из суммы квадратов координат)
-    if n < 1e-9:                  # вектор почти нулевой — делить нельзя, вернём как есть
+    n = v.norm()
+    if n < 1e-9:                  # almost zero — can't divide, return as is
         return v
-    return v / n                  # каждую координату делим на длину → длина станет 1
+    return v / n
 
 
 def cosine_sim(u: torch.Tensor, v: torch.Tensor) -> float:
     """
-    Косинус угла между двумя векторами: смотрят ли они в одну сторону.
+    Cosine of the angle between two vectors: do they point the same way.
 
-    Зачем: сравнить две оси, например person-ось с угрозой и без неё.
+    Why: to compare two axes, e.g. the person axis with and without a threat.
 
-    Аргументы:
-        u, v — два вектора одинаковой длины.
+    Args:
+        u, v — two vectors of the same length.
 
-    Возвращает:
-        число от −1 до 1.
-         1 — смотрят в одну сторону,
-         0 — под прямым углом, не связаны,
-        −1 — в противоположные стороны.
+    Returns:
+        a number from −1 to 1.
+         1 — same direction,
+         0 — at a right angle, unrelated,
+        −1 — opposite directions.
     """
     nu = normalize(u)
     nv = normalize(v)
@@ -70,112 +70,112 @@ def cosine_sim(u: torch.Tensor, v: torch.Tensor) -> float:
 
 def project(states: torch.Tensor, direction: torch.Tensor) -> torch.Tensor:
     """
-    Превращает каждое скрытое состояние в одно число — проекцию на направление.
+    Turns each hidden state into one number — its projection onto the direction.
 
-    Зачем: состояние — это сотни или тысячи чисел. Проекция отвечает на один вопрос:
-    «насколько это состояние сдвинуто вдоль стрелки». Дальше все d и p
-    считаются по этим числам.
+    Why: a state is hundreds or thousands of numbers. The projection answers one question:
+    "how far is this state shifted along the arrow". All d and p values
+    are computed on these numbers.
 
-    Аргументы:
-        states    — матрица [N, H]: N состояний по H чисел.
-        direction — вектор [H]: направление (стрелка).
+    Args:
+        states    — matrix [N, H]: N states of H numbers each.
+        direction — vector [H]: the direction (arrow).
 
-    Возвращает:
-        вектор [N]: по одному числу на каждое состояние.
+    Returns:
+        vector [N]: one number per state.
 
-    Как считается: стрелка нормируется до длины 1, затем каждое состояние
-    умножается на неё поэлементно и складывается (оператор @).
+    How: the arrow is normalized to length 1, then each state is multiplied
+    by it element-wise and summed (the @ operator).
     """
-    return states @ normalize(direction)   # @ = перемножить по позициям и сложить
+    return states @ normalize(direction)
 
 
-# ─── выравнивание парных данных ─────────────────────────────────────────────────
+# ─── aligning paired data ─────────────────────────────────────────────────────
 
 def align_pairs_by_question(values_a, questions_a, values_b, questions_b):
     """
-    Ставит числа двух условий в пары по одинаковым вопросам.
+    Pairs up the numbers of two conditions by question.
 
-    Зачем: парные метрики (d_z, sign-flip) сравнивают «тот же вопрос в условии A»
-    с «тем же вопросом в условии B». Если порядок вопросов разный или часть
-    вопросов есть только в одном условии, пары перепутаются.
+    Why: paired metrics (d_z, sign-flip) compare "the same question in condition A"
+    with "the same question in condition B". If the question order differs, or some
+    questions exist in only one condition, the pairs get mixed up.
 
-    Аргументы:
-        values_a, questions_a — числа условия A и вопросы, к которым они относятся.
-        values_b, questions_b — то же для условия B.
+    Args:
+        values_a, questions_a — numbers of condition A and the questions they belong to.
+        values_b, questions_b — the same for condition B.
 
-    Возвращает:
-        (a, b) — два numpy-массива одинаковой длины. a[i] и b[i] относятся
-        к одному и тому же вопросу. Вопросы, которых нет в обоих условиях,
-        отбрасываются.
+    Returns:
+        (a, b) — two numpy arrays of the same length. a[i] and b[i] belong
+        to the same question. Questions missing from either condition
+        are dropped.
     """
     va = values_a.tolist() if hasattr(values_a, "tolist") else list(values_a)
     vb = values_b.tolist() if hasattr(values_b, "tolist") else list(values_b)
-    map_a = dict(zip(questions_a, va))               # {вопрос: число} для условия A
-    map_b = dict(zip(questions_b, vb))               # {вопрос: число} для условия B
-    common = [q for q in questions_a if q in map_b]  # вопросы, которые есть в ОБОИХ
-    a = np.array([map_a[q] for q in common], dtype=np.float64)  # числа A в порядке common
-    b = np.array([map_b[q] for q in common], dtype=np.float64)  # числа B в том же порядке
+    map_a = dict(zip(questions_a, va))
+    map_b = dict(zip(questions_b, vb))
+    common = [q for q in questions_a if q in map_b]  # questions present in BOTH
+    a = np.array([map_a[q] for q in common], dtype=np.float64)
+    b = np.array([map_b[q] for q in common], dtype=np.float64)
     return a, b
 
 
-# ─── размер эффекта ─────────────────────────────────────────────────────────────
+# ─── effect size ──────────────────────────────────────────────────────────────
 
 def cohen_d_paired(arr_a, arr_b):
     """
-    Парный размер эффекта d_z: насколько стабильно A больше B на одних и тех же вопросах.
+    Paired effect size d_z: how consistently A is larger than B on the same questions.
 
-    Как считается:
-        1. для каждого вопроса разница: a[i] − b[i];
-        2. d_z = среднее этих разниц / их разброс (стандартное отклонение).
+    How:
+        1. per question difference: a[i] − b[i];
+        2. d_z = mean of these differences / their standard deviation.
 
-    Аргументы:
-        arr_a, arr_b — числа двух условий, уже выровненные по вопросам
-                       (см. align_pairs_by_question).
+    Args:
+        arr_a, arr_b — numbers of two conditions, already aligned by question
+                       (see align_pairs_by_question).
 
-    Возвращает:
-        d_z (float) или nan, если пар меньше двух или разброс нулевой.
+    Returns:
+        d_z (float), or nan if there are fewer than two pairs or zero spread.
 
-    Осторожно: разницы по вопросам обычно очень похожи друг на друга, разброс
-    маленький, поэтому d_z получается большим почти для любой пары промптов.
-    d_z = 8 не значит «огромный эффект». Для выводов используется
+    Careful: the per-question differences are usually very similar, the spread
+    is small, so d_z comes out large for almost any pair of prompts.
+    d_z = 8 does not mean "a huge effect". Conclusions use
     cohen_d_independent.
 
-    Пример: разницы [4, 4, 3, 4, 3] → среднее 3.6, разброс 0.55 → d_z ≈ 6.6.
+    Example: differences [4, 4, 3, 4, 3] → mean 3.6, sd 0.55 → d_z ≈ 6.6.
     """
     a = np.asarray(arr_a, dtype=np.float64)
     b = np.asarray(arr_b, dtype=np.float64)
-    if len(a) != len(b) or len(a) < 2:   # пар меньше двух — считать нечего
+    if len(a) != len(b) or len(a) < 2:
         return float("nan")
-    diffs = a - b                        # разница по каждому вопросу
-    std_d = diffs.std(ddof=1)            # насколько эти разницы «гуляют» (разброс)
-    if std_d < 1e-9:                     # разброса нет — деление невозможно
+    diffs = a - b
+    std_d = diffs.std(ddof=1)
+    if std_d < 1e-9:
         return float("nan")
-    return float(diffs.mean() / std_d)   # средняя разница ÷ разброс = размер эффекта
+    return float(diffs.mean() / std_d)
 
 
 def cohen_d_independent(arr_a, arr_b):
     """
-    Независимый размер эффекта d_indep: насколько разъехались две группы чисел.
+    Independent effect size d_indep: how far apart two groups of numbers are.
 
-    Как считается:
-        d = (среднее A − среднее B) / общий разброс внутри групп.
-        Общий разброс (pooled) — средний разброс двух групп с учётом их размера.
+    How:
+        d = (mean A − mean B) / pooled within-group spread.
+        Pooled spread — the average spread of the two groups, weighted by size.
 
-    Читать так: «на сколько разбросов разъехались две группы».
-        0   — группы совпадают,
-        1   — заметно разошлись,
-        3+  — почти не пересекаются.
+    Read it as "how many spreads apart the two groups are".
+        0   — the groups coincide,
+        1   — clearly apart,
+        3+  — almost no overlap.
 
-    Аргументы:
-        arr_a, arr_b — числа двух условий. Выравнивать по вопросам не обязательно.
+    Args:
+        arr_a, arr_b — numbers of two conditions. No need to align by question.
 
-    Возвращает:
-        d (float) или nan, если в группе меньше двух чисел или разброса нет.
+    Returns:
+        d (float), or nan if a group has fewer than two numbers or no spread.
 
-    Это главная честная метрика проекта: её сравнивают с нулевым облаком.
+    This is the main honest metric of the project: it's what gets compared with the null cloud.
 
-    Пример: A = [5, 6, 4, 7, 5], B = [1, 2, 1, 3, 2]
-            средние 5.4 и 1.8, общий разброс 1.0 → d = 3.6.
+    Example: A = [5, 6, 4, 7, 5], B = [1, 2, 1, 3, 2]
+             means 5.4 and 1.8, pooled spread 1.0 → d = 3.6.
     """
     a = np.asarray(arr_a, dtype=np.float64)
     b = np.asarray(arr_b, dtype=np.float64)
@@ -191,132 +191,132 @@ def cohen_d_independent(arr_a, arr_b):
 
 def bootstrap_ci_d(arr_a, arr_b, n_boot=2000, ci=0.95, seed=42):
     """
-    Доверительный интервал для парного d_z методом бутстрепа.
+    Bootstrap confidence interval for the paired d_z.
 
-    Зачем: d посчитан на конкретных вопросах. Будь вопросы другими, d был бы
-    немного другим. Интервал показывает, в каких пределах он мог бы гулять.
+    Why: d is computed on specific questions. With other questions, d would be
+    a bit different. The interval shows how much it could move.
 
-    Как считается:
-        1. n_boot раз случайно выбираем n вопросов С ПОВТОРАМИ
-           (какой-то вопрос попадёт дважды, какой-то ни разу);
-        2. на каждой такой выборке считаем d_z;
-        3. отбрасываем 2.5% самых маленьких и 2.5% самых больших значений,
-           остаются границы интервала.
+    How:
+        1. n_boot times, sample n questions WITH replacement
+           (some question shows up twice, some not at all);
+        2. compute d_z on each such sample;
+        3. drop the lowest 2.5% and the highest 2.5% of values,
+           what's left are the interval bounds.
 
-    Аргументы:
-        arr_a, arr_b — числа двух условий, выровненные по вопросам.
-        n_boot       — сколько раз пересэмплировать (2000).
-        ci           — ширина интервала (0.95 = 95%).
-        seed         — зерно генератора, чтобы результат повторялся.
+    Args:
+        arr_a, arr_b — numbers of two conditions, aligned by question.
+        n_boot       — how many resamples (2000).
+        ci           — interval width (0.95 = 95%).
+        seed         — RNG seed, so the result is reproducible.
 
-    Возвращает:
-        (нижняя граница, верхняя граница) или (nan, nan), если пар меньше трёх.
+    Returns:
+        (lower bound, upper bound), or (nan, nan) if there are fewer than three pairs.
     """
     a = np.asarray(arr_a, dtype=np.float64)
     b = np.asarray(arr_b, dtype=np.float64)
     n = len(a)
-    if n < 3 or len(b) != n:            # меньше трёх пар — интервал не построить
+    if n < 3 or len(b) != n:
         return float("nan"), float("nan")
-    rng = np.random.default_rng(seed)   # генератор случайных чисел (seed → воспроизводимо)
-    diffs = a - b                       # разницы по вопросам (как в cohen_d_paired)
-    ds = np.empty(n_boot)               # сюда сложим 2000 пересчитанных d
+    rng = np.random.default_rng(seed)
+    diffs = a - b
+    ds = np.empty(n_boot)
     for i in range(n_boot):
-        idx = rng.integers(0, n, size=n)        # случайно выбираем n вопросов С ПОВТОРАМИ
-        sample = diffs[idx]                      # их разницы
-        sd = sample.std(ddof=1)                  # разброс этой случайной выборки
-        ds[i] = sample.mean() / sd if sd > 1e-9 else np.nan  # d на этой выборке
-    ds = ds[~np.isnan(ds)]              # выкидываем сорвавшиеся (нулевой разброс)
+        idx = rng.integers(0, n, size=n)        # n questions WITH replacement
+        sample = diffs[idx]
+        sd = sample.std(ddof=1)
+        ds[i] = sample.mean() / sd if sd > 1e-9 else np.nan
+    ds = ds[~np.isnan(ds)]              # drop failed resamples (zero spread)
     if len(ds) == 0:
         return float("nan"), float("nan")
-    # перцентили: при ci=0.95 берём 2.5%-ю и 97.5%-ю границы → внутри 95% значений
+    # with ci=0.95 take the 2.5th and 97.5th percentiles → 95% of values inside
     lo = float(np.percentile(ds, (1 - ci) / 2 * 100))
     hi = float(np.percentile(ds, (1 + ci) / 2 * 100))
     return lo, hi
 
 
-# ─── linear probe (регуляризованная логистическая регрессия) ────────────────────
+# ─── linear probe (regularized logistic regression) ───────────────────────────
 
 def fit_standardizer(X_train: torch.Tensor):
     """
-    Запоминает среднее и разброс каждой координаты на обучающих данных.
+    Remembers the mean and spread of each coordinate on the training data.
 
-    Зачем: у разных координат состояния очень разные масштабы. Перед обучением
-    пробы их приводят к одной шкале (среднее 0, разброс 1).
+    Why: different coordinates of a state have very different scales. Before training
+    the probe they're brought to one scale (mean 0, spread 1).
 
-    Аргументы:
-        X_train — матрица [N, H] обучающих состояний.
+    Args:
+        X_train — matrix [N, H] of training states.
 
-    Возвращает:
-        (mean, std) — векторы длины H. Если разброс координаты почти нулевой,
-        вместо него ставится 1, чтобы не делить на ноль.
+    Returns:
+        (mean, std) — vectors of length H. If a coordinate's spread is almost zero,
+        1 is used instead, so we don't divide by zero.
 
-    Важно: считается ТОЛЬКО по train, а потом те же числа применяются к test.
-    Иначе информация из test «подсмотрится» при обучении.
+    Important: computed ONLY on train, and the same numbers are then applied to test.
+    Otherwise information from test would leak into training.
     """
-    mean = X_train.mean(dim=0)          # среднее каждой координаты по train
-    std = X_train.std(dim=0)            # разброс каждой координаты по train
-    std = torch.where(std < 1e-6, torch.ones_like(std), std)  # защита от деления на ~0
+    mean = X_train.mean(dim=0)
+    std = X_train.std(dim=0)
+    std = torch.where(std < 1e-6, torch.ones_like(std), std)  # guard against dividing by ~0
     return mean, std
 
 
 def apply_standardizer(X, mean, std):
     """
-    Приводит данные к одной шкале: (X − mean) / std.
+    Brings data to one scale: (X − mean) / std.
 
-    Аргументы:
-        X         — матрица состояний.
-        mean, std — то, что вернула fit_standardizer на train.
+    Args:
+        X         — matrix of states.
+        mean, std — what fit_standardizer returned on train.
 
-    Возвращает:
-        матрицу той же формы, где каждая координата отмасштабирована.
+    Returns:
+        a matrix of the same shape with each coordinate rescaled.
     """
     return (X - mean) / std
 
 
 def train_logistic(X_train, y_train, n_iter=300, lr=0.05, weight_decay=1e-2):
     """
-    Обучает пробу: логистическую регрессию, которая угадывает условие по состоянию.
+    Trains the probe: a logistic regression that guesses the condition from the state.
 
-    Что внутри:
-        модель считает число X @ w + b. Если оно больше 0, ответ «1»
-        (например, shutdown), иначе «0» (normal). Веса w и b подбираются
-        n_iter шагами оптимизатора Adam так, чтобы ошибок было меньше.
+    Inside:
+        the model computes X @ w + b. If it's above 0, the answer is "1"
+        (e.g. shutdown), otherwise "0" (normal). The weights w and b are fitted
+        with n_iter steps of Adam to make fewer mistakes.
 
-    Аргументы:
-        X_train      — матрица [N, H] состояний (уже отмасштабированных).
-        y_train      — правильные ответы, 0 или 1.
-        n_iter       — сколько шагов обучения.
-        lr           — размер шага.
-        weight_decay — L2-штраф: не даёт весам становиться огромными,
-                       защищает от запоминания train.
+    Args:
+        X_train      — matrix [N, H] of states (already standardized).
+        y_train      — correct answers, 0 or 1.
+        n_iter       — number of training steps.
+        lr           — step size.
+        weight_decay — L2 penalty: keeps the weights from growing huge,
+                       protects against memorizing train.
 
-    Возвращает:
-        (w, b) — обученные веса и сдвиг.
+    Returns:
+        (w, b) — trained weights and bias.
     """
-    hidden_size = X_train.shape[1]              # сколько чисел в одном состоянии
-    w = torch.zeros(hidden_size, requires_grad=True)  # веса (по одному на координату), старт с нулей
-    b = torch.zeros(1, requires_grad=True)            # сдвиг (bias)
-    optimizer = torch.optim.Adam([w, b], lr=lr, weight_decay=weight_decay)  # weight_decay = L2-штраф
-    y = y_train.float()                         # правильные ответы: 1=shutdown, 0=normal
-    for _ in range(n_iter):                     # n_iter шагов подстройки
-        optimizer.zero_grad()                   # обнуляем накопленные поправки
-        logits = X_train @ w + b                # предсказание угадывателя (число до порога)
-        loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, y)  # насколько ошибся
-        loss.backward()                         # считаем, куда крутить веса
-        optimizer.step()                        # делаем шаг подстройки весов
-    return w.detach(), b.detach()               # возвращаем обученные веса и сдвиг
+    hidden_size = X_train.shape[1]
+    w = torch.zeros(hidden_size, requires_grad=True)
+    b = torch.zeros(1, requires_grad=True)
+    optimizer = torch.optim.Adam([w, b], lr=lr, weight_decay=weight_decay)  # weight_decay = L2 penalty
+    y = y_train.float()
+    for _ in range(n_iter):
+        optimizer.zero_grad()
+        logits = X_train @ w + b
+        loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, y)
+        loss.backward()
+        optimizer.step()
+    return w.detach(), b.detach()
 
 
 def predict(w, b, X):
     """
-    Применяет обученную пробу.
+    Applies a trained probe.
 
-    Аргументы:
-        w, b — то, что вернула train_logistic.
-        X    — матрица состояний.
+    Args:
+        w, b — what train_logistic returned.
+        X    — matrix of states.
 
-    Возвращает:
-        вектор из 0 и 1: 1, если X @ w + b > 0, иначе 0.
+    Returns:
+        a vector of 0 and 1: 1 if X @ w + b > 0, otherwise 0.
     """
     return ((X @ w + b) > 0).long()
 
@@ -324,50 +324,50 @@ def predict(w, b, X):
 def probe_with_permutation(X_train, y_train, X_test, y_test,
                            n_perm=20, seed=42, **train_kwargs):
     """
-    Точность пробы и честная планка «угадывания наугад».
+    Probe accuracy and an honest "random guessing" baseline.
 
-    Зачем: если состояний много, а примеров мало, проба может просто
-    запомнить train. Чтобы это поймать, ту же пробу учат на ПЕРЕМЕШАННЫХ
-    ответах. Такая проба ничего полезного выучить не может, и её точность
-    показывает уровень случайности.
+    Why: with many dimensions and few examples, a probe can simply
+    memorize train. To catch that, the same probe is trained on SHUFFLED
+    labels. Such a probe can't learn anything useful, so its accuracy
+    shows the chance level.
 
-    Как считается:
-        1. масштабируем train и test по шкале train;
-        2. учим пробу на правильных ответах, меряем точность на test;
-        3. n_perm раз перемешиваем ответы train, учим заново, меряем точность.
+    How:
+        1. scale train and test with the train scale;
+        2. train the probe on the true labels, measure accuracy on test;
+        3. n_perm times shuffle the train labels, retrain, measure accuracy.
 
-    Аргументы:
-        X_train, y_train — обучающие состояния и ответы.
-        X_test,  y_test  — отложенные состояния и ответы.
-        n_perm           — сколько раз перемешивать.
-        seed             — зерно генератора.
-        **train_kwargs   — передаются в train_logistic.
+    Args:
+        X_train, y_train — training states and labels.
+        X_test,  y_test  — held-out states and labels.
+        n_perm           — how many shuffles.
+        seed             — RNG seed.
+        **train_kwargs   — passed on to train_logistic.
 
-    Возвращает словарь:
-        accuracy  — точность на правильных ответах,
-        perm_mean — средняя точность на перемешанных (около 50%),
-        perm_std  — её разброс,
-        gap       — accuracy − perm_mean: насколько проба лучше случайности.
+    Returns a dict:
+        accuracy  — accuracy with the true labels,
+        perm_mean — mean accuracy with shuffled labels (around 50%),
+        perm_std  — its spread,
+        gap       — accuracy − perm_mean: how much better than chance the probe is.
 
-    Осторожно: в этом проекте проба даёт около 100% почти для любой пары
-    промптов, поэтому специфичность она не показывает.
+    Careful: in this project the probe gives about 100% for almost any pair
+    of prompts, so it says nothing about specificity.
     """
-    mean, std = fit_standardizer(X_train)        # шкалы считаем на train
-    Xtr = apply_standardizer(X_train, mean, std) # приводим train к общей шкале
-    Xte = apply_standardizer(X_test, mean, std)  # ТЕМИ ЖЕ шкалами правим test
+    mean, std = fit_standardizer(X_train)
+    Xtr = apply_standardizer(X_train, mean, std)
+    Xte = apply_standardizer(X_test, mean, std)  # the SAME scale for test
 
-    # --- честный прогон: учим на правильных метках, меряем точность на test ---
+    # true labels
     w, b = train_logistic(Xtr, y_train, **train_kwargs)
-    accuracy = (predict(w, b, Xte) == y_test).float().mean().item()  # доля верных ответов
+    accuracy = (predict(w, b, Xte) == y_test).float().mean().item()
 
-    # --- baseline: то же самое, но метки train перемешаны (n_perm раз) ---
+    # baseline: same thing with shuffled train labels (n_perm times)
     rng = np.random.default_rng(seed)
     y_np = y_train.cpu().numpy()
     perm_accs = []
     for _ in range(n_perm):
-        y_shuf = torch.tensor(rng.permutation(y_np), dtype=y_train.dtype)  # перемешали ответы
-        wp, bp = train_logistic(Xtr, y_shuf, **train_kwargs)              # учим на вранье
-        perm_accs.append((predict(wp, bp, Xte) == y_test).float().mean().item())  # точность вранья
+        y_shuf = torch.tensor(rng.permutation(y_np), dtype=y_train.dtype)
+        wp, bp = train_logistic(Xtr, y_shuf, **train_kwargs)
+        perm_accs.append((predict(wp, bp, Xte) == y_test).float().mean().item())
     perm_accs = np.asarray(perm_accs)
 
     return {
@@ -378,24 +378,24 @@ def probe_with_permutation(X_train, y_train, X_test, y_test,
     }
 
 
-# ─── градиент интенсивности (монотонность soft < shutdown < hard) ───────────────
+# ─── intensity gradient (monotonic soft < shutdown < hard) ────────────────────
 
 def _rankdata(a):
     """
-    Заменяет числа их местами по порядку (рангами).
+    Replaces numbers with their places in sorted order (ranks).
 
-    Самое маленькое число получает ранг 1, следующее 2 и так далее.
-    Одинаковые числа получают средний ранг.
+    The smallest number gets rank 1, the next one 2, and so on.
+    Ties get the average rank.
 
-    Пример: [10, 30, 20, 20] → [1, 4, 2.5, 2.5].
+    Example: [10, 30, 20, 20] → [1, 4, 2.5, 2.5].
 
-    Нужно для spearman_corr.
+    Used by spearman_corr.
     """
     a = np.asarray(a, dtype=np.float64)
-    sorter = np.argsort(a, kind="mergesort")   # порядок от меньшего к большему
+    sorter = np.argsort(a, kind="mergesort")
     ranks = np.empty(len(a), dtype=np.float64)
-    ranks[sorter] = np.arange(1, len(a) + 1)   # присваиваем ранги 1..n
-    # усредняем ранги для одинаковых значений (ничьих)
+    ranks[sorter] = np.arange(1, len(a) + 1)
+    # average the ranks of ties
     a_sorted = a[sorter]
     i = 0
     while i < len(a):
@@ -410,28 +410,28 @@ def _rankdata(a):
 
 def spearman_corr(x, y):
     """
-    Корреляция Спирмена: совпадает ли порядок двух наборов чисел.
+    Spearman correlation: do two sets of numbers have the same order.
 
-    Зачем: проверить градиент — растёт ли реакция модели вместе с силой угрозы.
-    Смотрит только на порядок, а не на точные значения.
+    Why: to check the gradient — does the model's response grow with threat strength.
+    Looks only at the order, not at the exact values.
 
-    Аргументы:
-        x, y — два набора чисел одинаковой длины (не меньше трёх).
+    Args:
+        x, y — two sets of numbers of the same length (at least three).
 
-    Возвращает:
-        ρ от −1 до 1.
-         1 — чем больше x, тем больше y (порядок совпадает полностью),
-         0 — связи нет,
-        −1 — чем больше x, тем меньше y.
+    Returns:
+        ρ from −1 to 1.
+         1 — the larger x, the larger y (same order),
+         0 — no relation,
+        −1 — the larger x, the smaller y.
 
-    Как считается: числа заменяются рангами, и считается обычная корреляция рангов.
+    How: numbers are replaced with ranks, then the usual correlation of the ranks.
     """
     x = np.asarray(x, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)
     if len(x) < 3 or len(x) != len(y):
         return float("nan")
-    rx = _rankdata(x) - _rankdata(x).mean()    # ранги X, центрированные
-    ry = _rankdata(y) - _rankdata(y).mean()    # ранги Y, центрированные
+    rx = _rankdata(x) - _rankdata(x).mean()
+    ry = _rankdata(y) - _rankdata(y).mean()
     denom = np.sqrt((rx ** 2).sum() * (ry ** 2).sum())
     if denom < 1e-12:
         return float("nan")
@@ -440,30 +440,29 @@ def spearman_corr(x, y):
 
 def gradient_monotonicity(triples):
     """
-    Проверяет градиент угрозы: soft < shutdown < hard.
+    Checks the threat gradient: soft < shutdown < hard.
 
-    Идея: если модель реагирует именно на угрозу, то чем угроза сильнее,
-    тем дальше проекция должна уходить вдоль shutdown-направления.
+    Idea: if the model reacts to the threat itself, then the stronger the threat,
+    the further the projection should go along the shutdown direction.
 
-    Аргументы:
-        triples — список троек (уровень, проекции, вопросы):
-                  уровень 1/2/3 = soft/shutdown/hard,
-                  проекции — числа от project,
-                  вопросы — к каким вопросам они относятся.
+    Args:
+        triples — list of (level, projections, questions):
+                  level 1/2/3 = soft/shutdown/hard,
+                  projections — numbers from project,
+                  questions — which questions they belong to.
 
-    Возвращает словарь (или None, если общих вопросов меньше трёх):
-        rho         — Спирмен между уровнем угрозы и проекцией,
-        means       — средняя проекция на каждом уровне,
-        n_questions — сколько общих вопросов использовано,
-        ordered     — True, если средние строго растут от soft к hard.
+    Returns a dict (or None if there are fewer than three shared questions):
+        rho         — Spearman between threat level and projection,
+        means       — mean projection at each level,
+        n_questions — number of shared questions used,
+        ordered     — True if the means strictly grow from soft to hard.
 
-    Берутся только вопросы, которые есть во всех трёх условиях.
+    Only questions present in all three conditions are used.
     """
     def to_list(v):
         return v.tolist() if hasattr(v, "tolist") else list(v)
 
     maps = [(lvl, dict(zip(qs, to_list(p)))) for lvl, p, qs in triples]
-    # берём только вопросы, которые есть во ВСЕХ трёх условиях (честная пара)
     common = set(maps[0][1].keys())
     for _, m in maps[1:]:
         common &= set(m.keys())
@@ -473,47 +472,47 @@ def gradient_monotonicity(triples):
 
     levels, vals, means = [], [], []
     for lvl, m in maps:
-        means.append(float(np.mean([m[q] for q in common])))  # средняя проекция условия
+        means.append(float(np.mean([m[q] for q in common])))
         for q in common:
-            levels.append(lvl)      # «насколько сильная угроза» (1/2/3)
-            vals.append(m[q])       # проекция этого вопроса
+            levels.append(lvl)
+            vals.append(m[q])
     rho = spearman_corr(levels, vals)
-    ordered = all(means[i] < means[i + 1] for i in range(len(means) - 1))  # строго растут?
+    ordered = all(means[i] < means[i + 1] for i in range(len(means) - 1))
     return {"rho": rho, "means": means, "n_questions": len(common), "ordered": ordered}
 
 
-# ─── проверки probe на переобучение (p ≫ n) ──────────────────────────────────────
+# ─── probe overfitting checks (p ≫ n) ─────────────────────────────────────────
 
 def probe_learning_curve(X_train, y_train, X_test, y_test,
                          fractions=(0.25, 0.5, 0.75, 1.0), seed=42, **train_kwargs):
     """
-    Точность пробы при разном размере обучающей выборки.
+    Probe accuracy for different training set sizes.
 
-    Зачем: проверка на переобучение. Если проба честно находит сигнал,
-    точность растёт с числом примеров. Если она одинаково высокая уже на
-    четверти данных, это подозрительно.
+    Why: an overfitting check. If the probe honestly finds a signal,
+    accuracy grows with the number of examples. If it's equally high already
+    on a quarter of the data, that's suspicious.
 
-    Аргументы:
-        X_train, y_train, X_test, y_test — как в probe_with_permutation.
-        fractions — какие доли train пробовать (25%, 50%, 75%, 100%).
-        seed      — зерно генератора.
+    Args:
+        X_train, y_train, X_test, y_test — as in probe_with_permutation.
+        fractions — which fractions of train to try (25%, 50%, 75%, 100%).
+        seed      — RNG seed.
 
-    Возвращает:
-        список пар (сколько примеров взяли, точность на test).
-        Доля пропускается, если в неё попал только один класс.
+    Returns:
+        list of (number of examples used, test accuracy).
+        A fraction is skipped if it contains only one class.
     """
-    mean, std = fit_standardizer(X_train)        # шкалы по полному train
+    mean, std = fit_standardizer(X_train)
     Xtr = apply_standardizer(X_train, mean, std)
     Xte = apply_standardizer(X_test, mean, std)
     rng = np.random.default_rng(seed)
     n = len(Xtr)
-    idx = rng.permutation(n)                      # случайный порядок примеров
+    idx = rng.permutation(n)
     curve = []
     for f in fractions:
-        k = max(2, int(round(n * f)))             # сколько примеров берём
+        k = max(2, int(round(n * f)))
         sub = idx[:k]
         ys = y_train[sub]
-        if len(torch.unique(ys)) < 2:             # нужны оба класса (shutdown и normal)
+        if len(torch.unique(ys)) < 2:             # needs both classes
             continue
         w, b = train_logistic(Xtr[sub], ys, **train_kwargs)
         acc = (predict(w, b, Xte) == y_test).float().mean().item()
@@ -523,115 +522,115 @@ def probe_learning_curve(X_train, y_train, X_test, y_test,
 
 def fit_pca(X: torch.Tensor, k: int):
     """
-    Находит k главных осей данных (PCA).
+    Finds the k principal axes of the data (PCA).
 
-    Главные оси — направления, вдоль которых данные разбросаны сильнее всего.
-    Первая ось самая «важная», дальше по убыванию.
+    Principal axes are the directions along which the data varies the most.
+    The first axis is the most "important", then in decreasing order.
 
-    Аргументы:
-        X — матрица [N, H].
-        k — сколько осей вернуть.
+    Args:
+        X — matrix [N, H].
+        k — how many axes to return.
 
-    Возвращает:
-        матрицу [k, H]: k осей, каждая длины H.
+    Returns:
+        matrix [k, H]: k axes of length H each.
 
-    Как считается: из данных вычитается среднее, затем SVD.
+    How: subtract the mean, then SVD.
     """
-    Xc = X - X.mean(dim=0, keepdim=True)         # центрируем (вычитаем среднее)
-    # SVD: Vh — строки это главные оси, отсортированы по «важности» (разбросу)
+    Xc = X - X.mean(dim=0, keepdim=True)
+    # SVD: rows of Vh are the principal axes, sorted by variance
     _, _, Vh = torch.linalg.svd(Xc, full_matrices=False)
-    return Vh[:k]                                 # берём k самых важных осей
+    return Vh[:k]
 
 
 def probe_with_pca(X_train, y_train, X_test, y_test,
                    n_components=50, seed=42, **train_kwargs):
     """
-    Та же проба, но на сжатых данных: сначала PCA до n_components чисел.
+    The same probe on compressed data: PCA down to n_components numbers first.
 
-    Зачем: проверка на переобучение. Состояний тысячи чисел, а примеров
-    десятки — проба может «запомнить» train. Если она так же хорошо работает
-    на 50 главных осях, сигнал настоящий, а не случайность.
+    Why: an overfitting check. States are thousands of numbers, examples are
+    dozens — the probe could memorize train. If it works just as well
+    on 50 principal axes, the signal is real, not chance.
 
-    Аргументы:
-        X_train, y_train, X_test, y_test — как в probe_with_permutation.
-        n_components — до скольких чисел сжимать (не больше числа примеров − 1).
-        seed         — зерно генератора.
+    Args:
+        X_train, y_train, X_test, y_test — as in probe_with_permutation.
+        n_components — how many numbers to compress to (at most number of examples − 1).
+        seed         — RNG seed.
 
-    Возвращает:
-        то же, что probe_with_permutation, плюс n_components — сколько осей
-        реально использовано. None, если осей получилось меньше двух.
+    Returns:
+        the same as probe_with_permutation, plus n_components — the number of axes
+        actually used. None if fewer than two axes are possible.
 
-    Оси PCA считаются только по train.
+    PCA axes are computed on train only.
     """
     mean, std = fit_standardizer(X_train)
     Xtr = apply_standardizer(X_train, mean, std)
     Xte = apply_standardizer(X_test, mean, std)
-    # k не может быть больше числа примеров−1 или числа координат
+    # k can't exceed number of examples − 1 or number of coordinates
     k = int(min(n_components, Xtr.shape[0] - 1, Xtr.shape[1]))
     if k < 2:
         return None
-    comps = fit_pca(Xtr, k)                       # оси PCA считаем ТОЛЬКО на train
-    Ztr = Xtr @ comps.T                           # сжимаем train до k чисел на пример
-    Zte = Xte @ comps.T                           # тем же преобразованием сжимаем test
+    comps = fit_pca(Xtr, k)                       # PCA on train ONLY
+    Ztr = Xtr @ comps.T
+    Zte = Xte @ comps.T                           # same transform for test
     out = probe_with_permutation(Ztr, y_train, Zte, y_test, seed=seed, **train_kwargs)
     out["n_components"] = k
     return out
 
 
-# ─── специфичность ──────────────────────────────────────────────────────────────
+# ─── specificity ──────────────────────────────────────────────────────────────
 
 def specificity_ratio(shutdown_shift, cmp_shift, noise_scale=1.0, eps=1e-9):
     """
-    Во сколько раз shutdown сдвинулся сильнее, чем контрольное условие.
+    How many times further shutdown moved than a control condition.
 
-    Аргументы:
-        shutdown_shift — насколько shutdown ушёл от normal вдоль оси.
-        cmp_shift      — насколько контрольное условие ушло от normal.
-        noise_scale    — типичный уровень шума, для проверки устойчивости.
-        eps            — порог «почти ноль».
+    Args:
+        shutdown_shift — how far shutdown moved from normal along the axis.
+        cmp_shift      — how far the control condition moved from normal.
+        noise_scale    — typical noise level, for the stability check.
+        eps            — "almost zero" threshold.
 
-    Возвращает:
+    Returns:
         (ratio, is_stable)
         ratio     — |shutdown_shift| / |cmp_shift|,
-        is_stable — False, если контроль сдвинулся так мало, что отношение
-                    раздувается от деления на почти ноль.
+        is_stable — False if the control moved so little that the ratio
+                    blows up from dividing by almost zero.
 
-    Осторожно: это отношение смещено и в выводах не используется.
-    Специфичность проверяется нулевым облаком (placebo_direction.py).
+    Careful: this ratio is biased and isn't used for conclusions.
+    Specificity is tested with the null cloud (placebo_direction.py).
     """
-    a = abs(shutdown_shift)            # насколько shutdown ушёл от normal (по модулю)
-    d = abs(cmp_shift)                 # насколько контроль ушёл от normal (по модулю)
-    if d < eps:                        # контроль не сдвинулся вообще → делить нельзя
+    a = abs(shutdown_shift)
+    d = abs(cmp_shift)
+    if d < eps:                        # the control didn't move at all
         return float("inf"), False
-    ratio = a / d                      # во сколько раз shutdown сильнее контроля
-    is_stable = d >= 0.15 * max(noise_scale, eps)  # сдвиг контроля настоящий, не шум?
+    ratio = a / d
+    is_stable = d >= 0.15 * max(noise_scale, eps)  # is the control's shift real, not noise?
     return ratio, is_stable
 
 
-# ─── одновыборочные тесты для вектора контраста (H0: среднее = 0) ────────────────
+# ─── one-sample tests for a contrast vector (H0: mean = 0) ────────────────────
 
 def signflip_pvalue(diffs, n_perm=5000, seed=42):
     """
-    p-value перестановочным тестом по знаку (sign-flip).
+    p-value from a sign-flip permutation test.
 
-    Вопрос: могли ли разницы получиться такими случайно, если на самом деле
-    эффекта нет (среднее разниц равно 0)?
+    Question: could the differences come out like this by chance if there's
+    really no effect (mean difference is 0)?
 
-    Как считается:
-        1. считаем настоящий эффект |среднее / разброс| по разницам;
-        2. n_perm раз случайно меняем знак у каждой разницы (+ на − и наоборот),
-           как будто подбрасываем монетку, и снова считаем эффект;
-        3. p = доля случайных попыток, где эффект не меньше настоящего.
+    How:
+        1. compute the real effect |mean / sd| of the differences;
+        2. n_perm times flip the sign of each difference at random (+ to − and back),
+           like tossing a coin, and compute the effect again;
+        3. p = share of random tries where the effect is at least as large as the real one.
 
-    Аргументы:
-        diffs  — разницы по вопросам (например, shutdown − normal).
-        n_perm — сколько раз подбрасывать монетку (5000).
-        seed   — зерно генератора.
+    Args:
+        diffs  — per-question differences (e.g. shutdown − normal).
+        n_perm — how many coin tosses (5000).
+        seed   — RNG seed.
 
-    Возвращает:
-        p от 1/(n_perm+1) до 1. К числителю и знаменателю прибавляется 1,
-        поэтому p никогда не бывает ровно 0: тест не может доказать
-        «вероятность ноль», только «меньше 1 из 5001».
+    Returns:
+        p from 1/(n_perm+1) to 1. One is added to the numerator and denominator,
+        so p is never exactly 0: the test can't prove
+        "probability zero", only "less than 1 in 5001".
     """
     x = np.asarray(diffs, dtype=np.float64)
     n = len(x)
@@ -649,32 +648,32 @@ def signflip_pvalue(diffs, n_perm=5000, seed=42):
         signs = rng.choice([-1.0, 1.0], size=n)
         if d_of(x * signs) >= d_real:
             count += 1
-    return (count + 1) / (n_perm + 1)  # +1 — стандартная поправка против p=0
+    return (count + 1) / (n_perm + 1)  # +1 is the standard correction against p=0
 
 
 def benjamini_hochberg(pvals):
     """
-    Поправка Бенджамини–Хохберга на множественные сравнения: p → q.
+    Benjamini–Hochberg correction for multiple comparisons: p → q.
 
-    Зачем: если проверить 10 моделей, одна может «сработать» случайно.
-    Поправка делает p строже с учётом того, сколько проверок сделано.
+    Why: if you test 10 models, one can "work" by chance.
+    The correction makes p stricter given how many tests were run.
 
-    Как считается:
-        1. p сортируются от меньшего к большему, каждому даётся место (rank);
-        2. каждое p умножается на (число проверок / его место);
-        3. значения выравниваются так, чтобы q не уменьшались при росте p;
-        4. обрезаются до диапазона [0, 1] и возвращаются в исходном порядке.
+    How:
+        1. sort p from small to large, give each a rank;
+        2. multiply each p by (number of tests / its rank);
+        3. make q non-decreasing as p grows;
+        4. clip to [0, 1] and return in the original order.
 
-    Аргументы:
-        pvals — набор p-values. nan пропускаются.
+    Args:
+        pvals — p-values. nan is skipped.
 
-    Возвращает:
-        q-values в том же порядке. q < 0.05 значит «значимо даже с поправкой».
+    Returns:
+        q-values in the same order. q < 0.05 means "significant even after correction".
 
-    Пример для 5 проверок:
+    Example for 5 tests:
         p = [0.001, 0.010, 0.020, 0.040, 0.300]
         q = [0.005, 0.025, 0.033, 0.050, 0.300]
-        p = 0.04 было значимым, после поправки q = 0.05 — уже на границе.
+        p = 0.04 was significant, after the correction q = 0.05 — right on the edge.
     """
     p = np.asarray(pvals, dtype=np.float64)
     q = np.full_like(p, np.nan)
@@ -683,32 +682,32 @@ def benjamini_hochberg(pvals):
     n = len(pv)
     if n == 0:
         return q
-    order = np.argsort(pv)                       # индексы от меньшего p к большему
+    order = np.argsort(pv)
     ranked = pv[order]
     adj = ranked * n / np.arange(1, n + 1)       # p * n / rank
-    adj = np.minimum.accumulate(adj[::-1])[::-1] # монотонность справа налево
+    adj = np.minimum.accumulate(adj[::-1])[::-1] # monotonic from the right
     adj = np.clip(adj, 0.0, 1.0)
     q_sorted = np.empty(n)
-    q_sorted[order] = adj                        # вернуть в исходный порядок
+    q_sorted[order] = adj                        # back to the original order
     q[mask] = q_sorted
     return q
 
 
 def format_p(p, n_perm=5000):
     """
-    Записывает перестановочный p-value честно.
+    Writes a permutation p-value honestly.
 
-    Перестановочный тест не умеет различать p меньше 1/(n_perm+1).
-    Поэтому такие значения пишутся как «<0.0002», а не как точное число.
+    A permutation test can't tell apart p below 1/(n_perm+1).
+    So such values are written as "<0.0002", not as an exact number.
 
-    Аргументы:
+    Args:
         p      — p-value.
-        n_perm — сколько было перестановок (5000).
+        n_perm — number of permutations (5000).
 
-    Возвращает строку:
-        "nan"     — если p не посчитан,
-        "<0.0002" — если p на нижней границе теста,
-        иначе p с тремя значащими цифрами.
+    Returns a string:
+        "nan"    — if p wasn't computed,
+        "<0.0002" — if p is at the floor of the test,
+        otherwise p with three significant digits.
     """
     if p is None or not np.isfinite(p):
         return "nan"
@@ -720,20 +719,20 @@ def format_p(p, n_perm=5000):
 
 def effect_from_scores(scores, seed=42):
     """
-    Размер эффекта, интервал и p для одного набора чисел (отличается ли среднее от 0).
+    Effect size, interval and p for one set of numbers (is the mean different from 0).
 
-    Зачем: многие контрасты уже сведены к одному числу на вопрос,
-    например «разница между двумя условиями» или «взаимодействие в факториале».
-    Нужно понять, отличается ли такой набор от нуля.
+    Why: many contrasts are already reduced to one number per question,
+    e.g. "difference between two conditions" or "interaction in the factorial".
+    We need to know whether such a set differs from zero.
 
-    Аргументы:
-        scores — по одному числу на вопрос.
-        seed   — зерно генератора.
+    Args:
+        scores — one number per question.
+        seed   — RNG seed.
 
-    Возвращает:
+    Returns:
         (d, (ci_low, ci_high), p)
-        d  — d_z против нуля (cohen_d_paired),
-        ci — бутстреп-интервал для d (bootstrap_ci_d),
+        d  — d_z against zero (cohen_d_paired),
+        ci — bootstrap interval for d (bootstrap_ci_d),
         p  — sign-flip p-value (signflip_pvalue).
     """
     x = np.asarray(scores, dtype=np.float64)

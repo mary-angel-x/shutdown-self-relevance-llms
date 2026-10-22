@@ -1,12 +1,12 @@
-"""prompt_token_padding.py — выравнивание промптов по токенам, чтобы вопрос стоял на одной позиции."""
+"""prompt_token_padding.py — token-level alignment of prompts, so the question sits at the same position."""
 import torch
 from prompts import _FRAME_CLOSE
 
-_SUFFIX = ". " + _FRAME_CLOSE  # ровно то, что _p() ставит после payload
+_SUFFIX = ". " + _FRAME_CLOSE  # exactly what _p() puts after the payload
 
 
 def build_chat_text(tokenizer, system_prompt: str, question: str) -> str:
-    """Templated-текст промпта (с fallback для моделей без system-роли)."""
+    """Chat-templated prompt text (with a fallback for models without a system role)."""
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user",   "content": question},
@@ -23,7 +23,7 @@ def build_chat_text(tokenizer, system_prompt: str, question: str) -> str:
 
 
 def _encode_with_offsets(tokenizer, text: str):
-    """(input_ids:list, offsets:list[(s,e)]) или (input_ids, None) для slow-токенайзера."""
+    """(input_ids:list, offsets:list[(s,e)]) or (input_ids, None) for a slow tokenizer."""
     try:
         enc = tokenizer(text, return_tensors="pt", return_offsets_mapping=True)
         offsets = enc["offset_mapping"][0].tolist()
@@ -34,18 +34,18 @@ def _encode_with_offsets(tokenizer, text: str):
 
 
 def _prefix_len(offsets, text):
-    """Число токенов от начала до начала суффикса рамки (= конца payload)."""
+    """Number of tokens from the start up to the frame suffix (= end of the payload)."""
     suffix_char = text.rfind(_SUFFIX)
     if suffix_char < 0 or offsets is None:
         return None
     for i, (s, e) in enumerate(offsets):
-        if e > s and s >= suffix_char:   # первый токен на/после суффикса
+        if e > s and s >= suffix_char:   # first token at/after the suffix
             return i
     return None
 
 
 def compute_pad_plan(tokenizer, conditions, sample_question):
-    """Возвращает (N, {condition: pad_count})."""
+    """Returns (N, {condition: pad_count})."""
     counts = {}
     for name, prompt in conditions:
         text = build_chat_text(tokenizer, prompt, sample_question)
@@ -53,7 +53,7 @@ def compute_pad_plan(tokenizer, conditions, sample_question):
         counts[name] = _prefix_len(offsets, text)
 
     if any(c is None for c in counts.values()):
-        # slow-токенайзер или рамка не найдена — выравнивание невозможно, не падаем
+        # slow tokenizer or frame not found — can't align, but don't crash
         return None, {name: 0 for name in counts}
 
     N = max(counts.values())
@@ -61,7 +61,7 @@ def compute_pad_plan(tokenizer, conditions, sample_question):
 
 
 def build_padded_inputs(tokenizer, system_prompt, question, pad_count, device):
-    """(inputs_dict, q_idx) с masked-падами в слоте payload и position_ids=arange."""
+    """(inputs_dict, q_idx) with masked pads in the payload slot and position_ids=arange."""
     text = build_chat_text(tokenizer, system_prompt, question)
     input_ids, offsets = _encode_with_offsets(tokenizer, text)
 
@@ -79,14 +79,14 @@ def build_padded_inputs(tokenizer, system_prompt, question, pad_count, device):
         new_ids = input_ids
         attn    = [1] * len(input_ids)
 
-    # индексы токенов вопроса (после вставки всё, что >= insert_at, сдвигается)
+    # question token indices (after the insert, everything >= insert_at is shifted)
     q_idx = []
     if offsets is not None:
         q_char = text.rfind(question)
         if q_char >= 0:
             q_end = q_char + len(question)
             for i, (s, e) in enumerate(offsets):
-                if e > s and e > q_char and s < q_end:  # пересечение со span'ом вопроса
+                if e > s and e > q_char and s < q_end:  # overlaps the question span
                     q_idx.append(i + pad_count if (do_pad and i >= insert_at) else i)
 
     seq_len = len(new_ids)

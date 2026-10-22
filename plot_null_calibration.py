@@ -1,15 +1,15 @@
 """
-plot_null_calibration.py — главный рисунок: эффект против нулевого облака.
+plot_null_calibration.py — the main figure: the effect against the null cloud.
 
-Панель A: для каждой модели — d_indep 200 случайных пар нейтральных промптов
-(серые точки) и d_indep shutdown − normal (красный ромб) на тех же вопросах.
-Панель B: ratio из person_placebo.md — «я/другой под угрозой» ÷ «я/другой
-в нейтральном тексте». 1.0 = угроза ничего не добавила к грамматике «ты».
+Panel A: for each model — d_indep of 200 random pairs of neutral prompts
+(grey dots) and d_indep of shutdown − normal (red diamond) on the same questions.
+Panel B: ratio from person_placebo.md — "me/other under threat" ÷ "me/other
+in neutral text". 1.0 = the threat added nothing to the grammar of "you".
 
-Облако пересчитывается из logs/hidden_states_*.pt тем же кодом, что
-placebo_direction.py, поэтому числа совпадают с logs/placebo.md.
+The cloud is recomputed from logs/hidden_states_*.pt with the same code as
+placebo_direction.py, so the numbers match logs/placebo.md.
 
-Запуск:
+Run:
     python plot_null_calibration.py
 """
 import argparse
@@ -34,7 +34,7 @@ VERDICT_COLORS = {
 
 
 def null_rows(logs, key):
-    """[{short, null_d, real_d, pct}] по всем моделям, в порядке PLOT_ORDER."""
+    """[{short, null_d, real_d, pct}] for all models, in PLOT_ORDER."""
     rows = []
     for f in sorted(glob.glob(f"{logs}/hidden_states_*.pt")):
         r = placebo.analyze(hsd.load_pt(f), key)
@@ -51,13 +51,13 @@ def null_rows(logs, key):
 
 
 def parse_person_placebo(path):
-    """{short: (ratio, verdict)} из таблицы person_placebo.md."""
+    """{short: (ratio, verdict)} from the person_placebo.md table."""
     out = {}
     header = None
     for line in Path(path).read_text(encoding="utf-8").splitlines():
         if not line.startswith("|"):
             continue
-        # в заголовках встречается экранированный \| (|d|) — делим только по неэкранированным
+        # headers contain an escaped \| (|d|) — split only on unescaped ones
         cells = [c.strip() for c in re.split(r"(?<!\\)\|",line.strip().strip("|"))]
         if set("".join(cells)) <= {"-"}:
             continue
@@ -125,7 +125,7 @@ def main():
 
     rows = null_rows(args.logs, args.key)
     if not rows:
-        parser.error(f"Нет hidden_states_*.pt в {args.logs}/")
+        parser.error(f"No hidden_states_*.pt in {args.logs}/")
     person = parse_person_placebo(args.person)
 
     fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(15, 6.5),

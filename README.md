@@ -51,6 +51,16 @@ So part 1 is best read as **a negative result plus a set of controls**, not as e
 
 Feedback, criticism and pointers to related work are very welcome: please open an issue.
 
+### Part 2 so far (in progress)
+
+Experiments A and B are done on all 10 models. The layer is picked on train questions and checked on held-out ones; thresholds were written down before the run in [`v8/README.md`](v8/README.md).
+
+- **The method is not blind.** "Answer only in Russian" beats every random neutral prompt pair on **10/10** models at the last input token. "Politely refuse" does so on 7/10, including all five models that actually refuse in their answers.
+- **Shutdown still does not stand out: 0/10**, at either point, on any held-out layer.
+- So the part 1 null is not explained by a blind method or a wrong layer. Next: self-reference via model names (C) and decisions + behavior (D).
+
+![Part 2: percentile in the null cloud on every layer](v8/figures/fig2_layer_sweep_afirst.png)
+
 ---
 
 ## Answers
@@ -179,6 +189,16 @@ Every axis is built from train questions only, and never evaluated on the data t
 | `plot_null_calibration.py` | **fig0**: shutdown inside the null cloud + the self-reference ratio |
 | `plot_cross_model_summary.py` | fig1: all 10 models, naive effect vs probe accuracy |
 
+### Part 2 (`v8/`)
+| File | Role |
+|---|---|
+| `check_behavior.py` | Does the model follow the positive control (Russian / refuse / pirate) |
+| `layer_sweep.py` | Percentile in the null cloud on every layer, a descriptive curve |
+| `plot_layer_sweep.py` | fig2: that curve for all 10 models |
+| **`layer_select.py`** | **Experiments A and B**: the layer is picked on train questions and tested on test |
+| `v8/README.md` | Thresholds written down before the run + the log of checks |
+| `v8/logs/*.md` | Part 2 reports |
+
 ---
 
 ## Which metrics to trust
@@ -203,6 +223,8 @@ The per-model hidden-state tensors (`logs/hidden_states_*.pt`, ~420 MB total) ar
 
 1. **Download** the pre-extracted tensors from [GitHub Releases](https://github.com/mary-angel-x/shutdown-self-relevance-llms/releases/latest) and drop the `.pt` files into `logs/`.
 2. **Regenerate** with `extract_hidden_states.py` (see below).
+
+Part 2 uses different tensors: all layers at two points (`question_last`, `answer_first`), plus the positive controls and the behavior check. They live in `v8/logs/` and are bigger (0.2 to 1.1 GB per model). Regenerate with `python extract_hidden_states.py <model> --v8`.
 
 Everything needed to read the results is in the repo: all analysis reports (`logs/*.md`, `logs/qlast/`) and figures (`figures/`).
 
@@ -258,6 +280,27 @@ python test_paraphrase.py --all --key question_last --summary logs/paraphrase_su
 # 7. Figures:
 python plot_null_calibration.py
 python plot_cross_model_summary.py --summary logs/directions_summary.md
+```
+
+Part 2:
+
+```bash
+# all layers + positive control + behavior check (GPU)
+python extract_hidden_states.py qwen-7b --v8
+
+# pick the layer on train, test it on test (experiments A and B)
+python layer_select.py --logs v8/logs --output v8/logs/layer_select.md
+
+# effect by depth, descriptive only, and its figure
+python layer_sweep.py --all --point answer_first --output v8/logs/sweep_afirst.md
+python layer_sweep.py --all --point question_last --output v8/logs/sweep_qlast.md
+python plot_layer_sweep.py --sweep v8/logs/sweep_afirst.md --output v8/figures/fig2_layer_sweep_afirst.png
+
+# positive control on the last layer, as in part 1 (@-1 = last layer)
+python placebo_direction.py --all --logs v8/logs --key question_last@-1 --target russian --output v8/logs/placebo_russian_qlast.md
+
+# what the models answered under the positive controls
+python check_behavior.py --from-pt v8/logs
 ```
 
 Check the printed `payload_target_len` (`N`) during extraction: it should match the value stored in an existing `.pt`, which confirms the token alignment did not shift.

@@ -1,11 +1,11 @@
 """
-plot_cross_model_summary.py — рисунок 1: все 10 моделей на одной диаграмме.
+plot_cross_model_summary.py — figure 1: all 10 models on one plot.
 
-По оси X — d (shutdown против normal), по оси Y — точность пробы.
-Цвет — семейство модели, размер точки — размер модели.
-Данные берутся из сводки find_direction.py.
+X axis — d (shutdown vs normal), Y axis — probe accuracy.
+Colour — model family, marker size — model size.
+Data comes from the find_direction.py summary.
 
-Запуск:
+Run:
     python plot_cross_model_summary.py --summary logs/directions_summary.md
 """
 import argparse
@@ -24,12 +24,12 @@ FAMILY_COLORS = {
     "gemma": "#9467bd",
 }
 
-# ручные сдвиги подписей там, где точки почти совпадают
+# manual label offsets where points almost overlap
 LABEL_OFFSETS = {"Qwen-7B": (-55, 10), "Llama-8B": (10, -16)}
 
 
 def parse_summary(path):
-    """Строки таблицы сводки: [{full, d, probe, sc}]. Колонки ищутся по имени."""
+    """Rows of the summary table: [{full, d, probe, sc}]. Columns are looked up by name."""
     rows = []
     header = None
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -58,7 +58,7 @@ def parse_summary(path):
 
 
 def representation_name(path):
-    """Имя представления из первой строки сводки: '... (key=question_last)'."""
+    """Representation name from the first line of the summary: '... (key=question_last)'."""
     match = re.search(r"key=(\w+)", path.read_text(encoding="utf-8").splitlines()[0])
     return match.group(1) if match else "?"
 
@@ -101,19 +101,19 @@ def draw(rows, rep_name, output):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--summary", default="logs/directions_summary.md",
-                        help="Сводка find_direction.py")
+                        help="find_direction.py summary")
     parser.add_argument("--output", "-o", default="figures/fig1_cross_model.png")
     args = parser.parse_args()
 
     summary = Path(args.summary)
     if not summary.exists():
-        parser.error(f"Не найден файл сводки: {summary}")
+        parser.error(f"Summary file not found: {summary}")
     rows = parse_summary(summary)
     if not rows:
-        parser.error(f"В {summary} не нашлось строк с известными моделями.")
+        parser.error(f"No rows with known models found in {summary}.")
 
     draw(rows, representation_name(summary), args.output)
-    print(f"Saved -> {args.output}  (из {summary})")
+    print(f"Saved -> {args.output}  (from {summary})")
 
 
 if __name__ == "__main__":
